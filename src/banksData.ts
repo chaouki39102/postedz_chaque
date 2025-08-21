@@ -1,0 +1,426 @@
+import { Bank } from './types';
+
+export const initialBanks: Bank[] = [
+  {
+    id: 'bna_dz',
+    name: 'البنك الوطني الجزائري',
+    name_fr: 'Banque Nationale d\'Algérie',
+    checkImageUrl: '/banks/alg-bna.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+    {
+    id: 'poste_dz',
+    name: 'بريد الجزائر',
+    name_fr: 'Algérie Poste',
+    checkImageUrl: '/banks/alg-cndp.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'abc_dz_2',
+    name: 'بنك ABC - نموذج 2',
+    name_fr: 'ABC Bank - Modèle 2',
+    checkImageUrl: '/banks/alg-abc2.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'abc_dz_24',
+    name: 'بنك ABC - نموذج 24',
+    name_fr: 'ABC Bank - Modèle 24',
+    checkImageUrl: '/banks/alg-abc24.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'bank_algeria',
+    name: 'بنك الجزائر',
+    name_fr: 'Banque d\'Algérie',
+    checkImageUrl: '/banks/alg-alg.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'bdl_dz',
+    name: 'بنك التنمية المحلية',
+    name_fr: 'Banque de Développement Local',
+    checkImageUrl: '/banks/alg-bdl.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'bdl_dz_2',
+    name: 'بنك التنمية المحلية - نموذج 2',
+    name_fr: 'Banque de Développement Local - Modèle 2',
+    checkImageUrl: '/banks/alg-bdl2.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'bea_dz',
+    name: 'البنك الخارجي الجزائري',
+    name_fr: 'Banque Extérieure d\'Algérie',
+    checkImageUrl: '/banks/alg-bea.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'bna_dz_2',
+    name: 'البنك الوطني الجزائري - نموذج 2',
+    name_fr: 'Banque Nationale d\'Algérie - Modèle 2',
+    checkImageUrl: '/banks/alg-bna2.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'bnp_dz',
+    name: 'BNP باريبا الجزائر',
+    name_fr: 'BNP Paribas El Djazaïr',
+    checkImageUrl: '/banks/alg-bnp.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'albaraka_dz',
+    name: 'بنك البركة الجزائر',
+    name_fr: 'Al Baraka Bank Algérie',
+    checkImageUrl: '/banks/alg-brka3.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'cnep_dz',
+    name: 'القرض الشعبي الجزائري (CNEP)',
+    name_fr: 'Crédit Populaire d\'Algérie (CNEP)',
+    checkImageUrl: '/banks/alg-cndp.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'cpa_dz',
+    name: 'القرض الشعبي الجزائري (CPA)',
+    name_fr: 'Crédit Populaire d\'Algérie (CPA)',
+    checkImageUrl: '/banks/alg-cpa.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'gulf_dz',
+    name: 'بنك الخليج الجزائر',
+    name_fr: 'Gulf Bank Algérie',
+    checkImageUrl: '/banks/alg-gulf3.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'housing_dz',
+    name: 'بنك الإسكان للتجارة والتمويل',
+    name_fr: 'Housing Bank For Trade & Finance',
+    checkImageUrl: '/banks/alg-hous.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'ntx_dz',
+    name: 'بنك NTX (عام)',
+    name_fr: 'NTX Bank (Générique)',
+    checkImageUrl: '/banks/alg-ntx.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'sga_dz',
+    name: 'سوسيتيه جنرال الجزائر',
+    name_fr: 'Société Générale Algérie',
+    checkImageUrl: '/banks/alg-sga.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'slm_dz',
+    name: 'بنك SLM (عام)',
+    name_fr: 'SLM Bank (Générique)',
+    checkImageUrl: '/banks/alg-slm2.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+  {
+    id: 'trust_dz',
+    name: 'بنك الثقة الجزائر',
+    name_fr: 'Trust Bank Algérie',
+    checkImageUrl: '/banks/alg-trst.jpg',
+    initialPositions: {
+      ar: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+      fr: {
+        date: { x: 83, y: 55 },
+        place: { x: 63, y: 56 },
+        beneficiary: { x: 78, y: 46 },
+        amount: { x: 90, y: 17 },
+        amountWords: { x: 56, y: 32, width: 450 },
+      },
+    },
+  },
+];
+
+export const getBankById = (id: string): Bank | undefined => {
+  return initialBanks.find(bank => bank.id === id);
+};
