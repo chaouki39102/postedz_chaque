@@ -149,10 +149,14 @@ export const DEFAULT_WIDTH_PERCENT = 50;
  * العرض نسبة مئوية من عرض الشيك وليس بكسل، لأن العرض بالبكسل كان يجعل
  * الالتفاف مختلفاً بين المعاينة (≈900px) والطباعة (210mm ≈ 794px)،
  * فيخرج النص المطبوع غير مطابق للمعاينة.
+ *
+ * والمنزلتان: وحدة واحدة = 2.10mm على الشيك، فالتقريب لمنزلة واحدة
+ * يجعل العرض يقفز 2mm ويمنع ضبط حدّ الالتفاف على سطر بعينه.
  */
 export const clampWidthPercent = (value: number | undefined): number => {
   if (value === undefined || !Number.isFinite(value)) return DEFAULT_WIDTH_PERCENT;
-  return Math.min(MAX_WIDTH_PERCENT, Math.max(MIN_WIDTH_PERCENT, value));
+  const rounded = Math.round(value * 100) / 100;
+  return Math.min(MAX_WIDTH_PERCENT, Math.max(MIN_WIDTH_PERCENT, rounded));
 };
 
 /**
@@ -394,6 +398,11 @@ const delay = (ms: number): Promise<void> =>
  * تعطي حروفاً بخط الاحتياطي بارتفاعات مختلفة فينزاح النص عن مواضعه
  * المحفوظة. والصورة عنصر <img> لا خلفية CSS: المتصفحات لا تطبع خلفيات
  * CSS إلا بخيار «طباعة الرسومات الخلفية» في حوار الطباعة.
+ *
+ * `fonts.load` قبل `fonts.ready` مقصود: `ready` وحده يعدّ الخطوط
+ * الجارية الآن، وقد يكون انقضى قبل أن يبدأ تنزيل Cairo (لأنه يُطلب
+ * من ورقة الأنماط بعد `document.write`)، فيعود فوراً فنطبع بخط
+ * الاحتياطي. الطلب الصريح للعائلة يضمن انتظار Cairo نفسه.
  */
 const waitForPrintable = async (target: Window): Promise<void> => {
   const doc = target.document;
@@ -409,7 +418,19 @@ const waitForPrintable = async (target: Window): Promise<void> => {
     )
   );
 
-  await doc.fonts?.ready;
+  const fonts = doc.fonts;
+  if (!fonts) return;
+
+  /*
+   * وجها الخط: النصوص العربية واللاتينية في واجهين لـunicode-range،
+   * فيجب تحميلهما معاً وإلا انتظرنا وجه العربي وطبعنا اللاتيني
+   * بخط الاحتياطي.
+   */
+  await Promise.all([
+    fonts.load('400 1em Cairo', 'ب'),
+    fonts.load('400 1em Cairo', 'a'),
+  ]);
+  await fonts.ready;
 };
 
 /**

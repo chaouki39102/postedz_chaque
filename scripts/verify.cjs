@@ -1,4 +1,4 @@
-/**
+﻿/**
  * فحوص تفاعلية بعد الإقلاع: الاستمرارية، تبديل البنك، الالتفاف.
  *
  * يكمل smoke.cjs: الأول يثبت أن التطبيق يقلع، وهذا يثبت أن ما كتبه
@@ -525,7 +525,7 @@ const countLines = (text) => (text === '' ? 0 : text.trimEnd().split('\n').lengt
       closed: false,
       document: {
         images: [],
-        fonts: { ready: Promise.resolve() },
+        fonts: { ready: Promise.resolve(), load: () => Promise.resolve([]) },
         open() {},
         write(html) { written = html; },
         close() {},
@@ -918,7 +918,7 @@ const countLines = (text) => (text === '' ? 0 : text.trimEnd().split('\n').lengt
     const nativeOpen = window.open;
     window.open = () => ({
       closed: false,
-      document: { images: [], fonts: { ready: Promise.resolve() }, open() {}, write() {}, close() {} },
+      document: { images: [], fonts: { ready: Promise.resolve(), load: () => Promise.resolve([]) }, open() {}, write() {}, close() {} },
       addEventListener() {},
       focus() {},
       print() {},
@@ -1140,7 +1140,7 @@ const countLines = (text) => (text === '' ? 0 : text.trimEnd().split('\n').lengt
       closed: false,
       document: {
         images: [],
-        fonts: { ready: Promise.resolve() },
+        fonts: { ready: Promise.resolve(), load: () => Promise.resolve([]) },
         open() {},
         write(doc) { html = doc; },
         close() {},
@@ -1174,6 +1174,104 @@ const countLines = (text) => (text === '' ? 0 : text.trimEnd().split('\n').lengt
     JSON.stringify({
       sizes: Array.from((printed.html ?? '').matchAll(/font-size:[\d.]+cqw/g)).map((m) => m[0]),
     })
+  );
+
+  /*
+   * دقة الموضع: أصل الشكوى "أنزل الحقل قليلاً فيطبع فيبقى كما هو".
+   *
+   * السبب كان تقريب الإحداثيات إلى عدد صحيح: 1% من عرض الشيك = 2.10mm
+   * و1% من ارتفاعه = 0.99mm، فأي تعديل دون نصف وحدة يبتلعه التقريب.
+   * نجبر تعديل 0.4% ونطلب ظهوره في مستند الطباعة بنفس القيمة، ثم نعيد
+   * الموضع حتى لا نترك القاعدة على قيمة اختبارية.
+   */
+  const nudged = await cdp.evaluate(`(async () => {
+    const setValue = (input, value) => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+      setter.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    };
+
+    // لازم الحقول ظاهرة حتى توجد حقول الإحداثيات
+    const toggle = Array.from(document.querySelectorAll('button'))
+      .find((b) => b.getAttribute('aria-expanded') === 'false');
+    if (toggle) toggle.click();
+    await new Promise((r) => setTimeout(r, 500));
+
+    const y = document.getElementById('date-y');
+    if (!y) return { error: 'position input missing' };
+    const before = Number(y.value);
+    const target = Math.round((before + 0.4) * 100) / 100;
+    setValue(y, String(target));
+    await new Promise((r) => setTimeout(r, 400));
+
+    let html = '';
+    const nativeOpen = window.open;
+    window.open = () => ({
+      closed: false,
+      document: {
+        images: [],
+        fonts: { ready: Promise.resolve(), load: () => Promise.resolve([]) },
+        open() {},
+        write(doc) { html = doc; },
+        close() {},
+      },
+      addEventListener() {},
+      focus() {},
+      print() {},
+      close() { this.closed = true; },
+    });
+    const button = Array.from(document.querySelectorAll('button'))
+      .find((b) => b.innerText.trim() === 'طباعة' || b.innerText.trim() === 'Imprimer');
+    button?.click();
+    await new Promise((r) => setTimeout(r, 1600));
+    window.open = nativeOpen;
+
+    // نعيد القيمة السابقة حتى لا نترك طباعة المستخدم على قيمة اختبارية
+    setValue(y, String(before));
+    await new Promise((r) => setTimeout(r, 300));
+    return { before, target, html };
+  })()`);
+
+  check(
+    'a fraction of a percent of position change survives to the print',
+    new RegExp(`top:${nudged.target}%`).test(nudged.html ?? ''),
+    JSON.stringify({
+      before: nudged.before,
+      target: nudged.target,
+      printed: (nudged.html ?? '').match(/top:[\d.]+%/)?.[0] ?? 'none',
+      error: nudged.error ?? null,
+    })
+  );
+
+  /*
+   * نقطة الارتكاز واحدة في المعاينة والمطبوع.
+   *
+   * كان الحقل في المعاينة محشواً أفقياً بـ 12px (≈3.2mm على ورق
+   * 210mm) والمطبوع بلا حشو: فنصّ المعاينة على بُعد 3.2mm من
+   * الإحداثية والنصّ المطبوع عليها تماماً. فرق ثابت يُقرأ خطأ موضعاً.
+   * نقيس الحشو الأفقي لكل حقل في المعاينة ونطالبه أن يكون صفراً كما
+   * في المطبوع.
+   */
+  const anchors = await cdp.evaluate(`(() => {
+    const box = document.getElementById('check-preview');
+    if (!box) return { error: 'preview box missing' };
+    return Array.from(box.querySelectorAll('.print-text')).map((el) => {
+      const style = getComputedStyle(el);
+      return {
+        text: (el.textContent || '').slice(0, 12),
+        padStart: style.paddingInlineStart,
+        padEnd: style.paddingInlineEnd,
+      };
+    });
+  })()`);
+
+  check(
+    'the preview anchors the text on the same edge as the print (no horizontal padding)',
+    Array.isArray(anchors) &&
+      anchors.length > 0 &&
+      anchors.every((field) => field.padStart === '0px' && field.padEnd === '0px'),
+    JSON.stringify(anchors)
   );
 
   // البقاء بعد إعادة التحميل: الهامش في جدول التفضيلات لا في حالة مؤقتة

@@ -3,7 +3,7 @@ import { Calendar, MapPin, User, DollarSign, Settings, Sparkles, Bookmark, Save 
 import type { CheckData, PositionMap, Language, Preset } from '../types';
 import { MAX_AMOUNT } from '../constants';
 import { useLabelProxy, useLabels } from '../context/labelsCore';
-import { patchPosition } from '../utils/positions';
+import { parsePositionInput, patchPosition } from '../utils/positions';
 
 /** حدود عرض نص المبلغ بالحروف (نسبة مئوية من عرض الشيك) */
 const MIN_WIDTH_PERCENT = 10;
@@ -103,19 +103,25 @@ const CheckForm: React.FC<CheckFormProps> = ({
     [onDateInput, setCheckData]
   );
 
-  const handlePositionChange = useCallback(
-    (field: string, axis: 'x' | 'y', value: number) => {
-      // patchPosition لا التوزيع المباشر: الحقل قد يكون غائباً من الخريطة
-      setPositions((current) => patchPosition(current, field, { [axis]: value }));
+  /**
+   * حقل إحداثية يغيّر موضعاً ولا يقفز إلى الصفر.
+   *
+   * `parsePositionInput` يرجع null للنص غير الصالح بعدّ لحظات (الحقل
+   * فارغ أو فيه سالب ناقص)، فنُبقي القيمة السابقة بدل الضبط على 0:
+   * الضبط على 0 كان ينقل الحقل إلى طرف الشيك لحظياً ثم يعود، فيقرأه
+   * المستخدم على أنه "الموضع لا يستجيب".
+   *
+   * والضبط يمرّ بـ patchPosition لا بالتوزيع المباشر: الحقل قد يكون
+   * غائباً من الخريطة، فالتوزيع ينتج إحداثية بلا y ويرفض sql.js الحفظ.
+   */
+  const handlePositionInput = useCallback(
+    (field: string, axis: 'x' | 'y', raw: string) => {
+      const parsed = parsePositionInput(raw);
+      if (parsed === null) return;
+      setPositions((current) => patchPosition(current, field, { [axis]: parsed }));
     },
     [setPositions]
   );
-
-  /** يحوّل مدخلات الأرقام إلى عدد صحيح، مع تجاهل القيم الفارغة */
-  const parseNumericInput = (raw: string): number => {
-    const parsed = Number.parseInt(raw, 10);
-    return Number.isNaN(parsed) ? 0 : parsed;
-  };
 
   const renderPositionControls = (field: PositionField) => {
     if (!showPositionControls) return null;
@@ -145,9 +151,9 @@ const CheckForm: React.FC<CheckFormProps> = ({
                 <input
                   id={inputId}
                   type="number"
-                  step={1}
+                  step={0.1}
                   value={position[axis] ?? 0}
-                  onChange={(e) => handlePositionChange(field, axis, parseNumericInput(e.target.value))}
+                  onChange={(e) => handlePositionInput(field, axis, e.target.value)}
                   className={`w-full px-2 py-1.5 text-xs border-2 ${theme.input} rounded-lg transition-all duration-200 mobile-input dark:bg-gray-700 dark:text-white`}
                 />
               </div>
@@ -289,9 +295,9 @@ const CheckForm: React.FC<CheckFormProps> = ({
                   <input
                     id={inputId}
                     type="number"
-                    step={1}
+                    step={0.1}
                     value={positions.amountWords?.[axis] ?? 0}
-                    onChange={(e) => handlePositionChange('amountWords', axis, parseNumericInput(e.target.value))}
+                    onChange={(e) => handlePositionInput('amountWords', axis, e.target.value)}
                     className="w-full px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm border-2 border-orange-200 dark:border-orange-700 rounded-lg focus:border-orange-500 dark:focus:border-orange-400 transition-all duration-200 mobile-input dark:bg-gray-700 dark:text-white"
                   />
                 </div>
@@ -309,16 +315,18 @@ const CheckForm: React.FC<CheckFormProps> = ({
                 type="number"
                 min={MIN_WIDTH_PERCENT}
                 max={MAX_WIDTH_PERCENT}
-                step={1}
+                step={0.1}
                 value={clampWidthPercent(positions.amountWords?.widthPercent)}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const parsed = parsePositionInput(e.target.value);
+                  if (parsed === null) return;
                   setPositions((current) =>
                     patchPosition(current, 'amountWords', {
-                      widthPercent: clampWidthPercent(parseNumericInput(e.target.value)),
+                      widthPercent: clampWidthPercent(parsed),
                     })
-                  )
-                }
-                className="w-full px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm border-2 border-orange-200 dark:border-orange-700 rounded-lg focus:border-orange-500 dark:focus:border-orange-400 transition-all duration-200 mobile-input dark:bg-gray-700 dark:text-white"
+                  );
+                }}
+                className="w-full px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm border-2 border-orange-200 md:border-orange-700 focus:border-orange-500 dark:focus:border-orange-400 transition-all duration-200 mobile-input dark:bg-gray-700 dark:text-white"
                 placeholder={language === 'ar' ? 'مثال: 50' : 'Ex: 50'}
                 aria-describedby="amountWords-widthPercent-hint"
               />

@@ -5,7 +5,7 @@ import { formatDateNumeric } from '../utils/date';
 import { CHECK_FIELDS } from '../types';
 import { useLabelProxy } from '../context/labelsCore';
 import { loadPreference, savePreference } from '../utils/storage';
-import { patchPosition } from '../utils/positions';
+import { clampPosition, patchPosition } from '../utils/positions';
 import {
   printCheck,
   clampFontCqw,
@@ -32,10 +32,6 @@ const FIELD = {
 
 /** العناصر المحاذاة لليمين بدل اليسار: مصدر واحد مع مستند الطباعة */
 const isRightAligned = (field: FieldId): boolean => FIELD_LAYOUT[field].rightAligned;
-
-/** حدود حركة السحب (نسبة مئوية) */
-const MIN_OFFSET = -100;
-const MAX_OFFSET = 200;
 
 /** عرض ورقة الشيك الحقيقي 210mm بالبكسل عند 96dpi (نسبة CSS) */
 const PRINT_WIDTH_PX = (210 * 96) / 25.4;
@@ -81,9 +77,6 @@ const formatCurrency = (num: number): string =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-
-const clamp = (value: number, min: number, max: number): number =>
-  Math.max(min, Math.min(max, value));
 
 interface CheckPreviewProps {
   checkData: CheckData;
@@ -226,13 +219,22 @@ const CheckPreview: React.FC<CheckPreviewProps> = ({
         let deltaX = ((event.clientX - drag.startX) / rect.width) * 100;
         const deltaY = ((event.clientY - drag.startY) / rect.height) * 100;
 
-      // العناصر المحاذاة لليمين تتحرك عكسياً
-      if (isRightAligned(drag.field)) deltaX = -deltaX;
+        /*
+         * الحقول المحاذية لليمين تتحرك عكسياً: إحداثيتها تقيس المسافة
+         * من الحافة اليمنى، فسحب الحقل يميناً يعني نقصانها.
+         */
+        if (isRightAligned(drag.field)) deltaX = -deltaX;
 
+        /*
+         * لا تقريب إلى عدد صحيح هنا: كان يقرب، فتصير أصغر حركة في السحب
+         * 1% = 2.1mm أفقياً و0.99mm عمودياً، فيبتلع التقريب تعديل
+         * المستخدم فلا يتغير الموضع، أو يقفز النص 2mm دفعة واحدة.
+         * clampPosition يحتفظ بمنزلتين عشريتين (0.021mm).
+         */
         commitDragPosition(
           drag.field,
-          Math.round(clamp(drag.origin.x + deltaX, MIN_OFFSET, MAX_OFFSET)),
-          Math.round(clamp(drag.origin.y + deltaY, MIN_OFFSET, MAX_OFFSET))
+          clampPosition(drag.origin.x + deltaX),
+          clampPosition(drag.origin.y + deltaY)
         );
       });
     };
@@ -305,14 +307,18 @@ const CheckPreview: React.FC<CheckPreviewProps> = ({
           'absolute font-bold text-black select-none',
           'transition-all duration-200 rounded-lg print-text',
           /*
-           * المبلغ بالحروف: بدون حشو أفقي إطلاقاً.
-           * الحشو كان يسرق مساحة من العرض المحدد، فيقلّ الالتفاف في
-           * المعاينة عن الطباعة (لأن box-sizing يشمل الحشو داخل العرض).
-           * التمييز البصري يأتي من لون الخلفية عند التحويم، ولا يؤثر على التخطيط.
+           * بلا حشو أفقي إطلاقاً، في الحقول كلها لا في المبلغ بالحروف
+           * فقط. الحقل مربوط بالـ inline-start من x، فحشو 12px كان يزيح
+           * النص 12px يميناً في المعاينة (≈3.2mm على ورق 210mm) بينما
+           * المطبوع بلا حشو يخرج النص على الإحداثية نفسها — فرق ثابت
+           * يراه المستخدم على ورقه الحقيقي ويظنه خطأ في الموضع.
+           * والحشو العمودي يجوز: متماثل، فلن يزيح مركز النص عن y.
+           *
+           * المبلغ بالحروف: لا حشو من أي نوع، لأن الحشو الأفقي كان
+           * يسرق من العرض المحدد فيقلّ الالتفاف عن الطباعة (box-sizing
+           * يشمل الحشو داخل العرض).
            */
-          isWrapping
-            ? 'py-1'
-            : 'px-3 py-1.5 drop-shadow-sm',
+          isWrapping ? 'py-1' : 'py-1.5 drop-shadow-sm',
           isLocked ? 'cursor-default' : `cursor-grab ${theme.hover}`,
           isActive ? `${theme.active} shadow-lg z-50` : '',
         ].filter(Boolean).join(' ')}
@@ -549,7 +555,7 @@ const CheckPreview: React.FC<CheckPreviewProps> = ({
             type="range"
             min={MIN_WIDTH_PERCENT}
             max={MAX_WIDTH_PERCENT}
-            step={1}
+            step={0.1}
             value={amountWordsWidth}
             onChange={(event) => setAmountWordsWidth(Number(event.target.value))}
             className="w-full accent-orange-500 cursor-pointer"
