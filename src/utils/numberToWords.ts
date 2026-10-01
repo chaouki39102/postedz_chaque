@@ -1,16 +1,19 @@
-// تحويل الأرقام إلى كلمات باللغة العربية مع دعم المبالغ الكبيرة جداً
+/**
+ * تحويل الأرقام إلى كلمات باللغة العربية مع دعم المبالغ الكبيرة جداً.
+ * لا ترمي استثناءات أبداً: تُرجع نصاً فارغاً أو رسالة خطأ آمنة.
+ */
 export const numberToArabicWords = (num: number, currency: string = 'دينار جزائري', decimalCurrency: string = 'سنتيم'): string => {
   if (isNaN(num) || !isFinite(num)) return '';
-  
+
   // التحقق من الحد الأقصى المدعوم
   if (Math.abs(num) >= 1e18) {
-    throw new Error('الرقم كبير جداً. الحد الأقصى المدعوم هو 999 كوادريليون');
+    return 'رقم كبير جداً غير مدعوم';
   }
-  
+
   // فصل الجزء الصحيح والعشري مع التعامل مع القيم السالبة
   const parts = Math.abs(num).toFixed(2).split('.');
-  const integerPart = parseInt(parts[0]);
-  const decimalPart = parseInt(parts[1]);
+  const integerPart = parseInt(parts[0], 10);
+  const decimalPart = parseInt(parts[1], 10);
 
   let result = '';
 
@@ -100,7 +103,8 @@ const convertIntegerToArabic = (num: number): string => {
     } else if (count >= 3 && count <= 10) {
       return unit.plural;
     } else {
-      return unit.singular;
+      // المفرد منصوب: "ألفاً" / "مليوناً"
+      return unit.singular + 'اً';
     }
   };
 
@@ -115,16 +119,18 @@ const convertIntegerToArabic = (num: number): string => {
   for (const unit of scaleUnits) {
     if (remainingNum >= unit.value) {
       const count = Math.floor(remainingNum / unit.value);
-      const countText = convertThreeDigits(count);
       const scaleWord = getScaleWord(count, unit);
-      
-      if (count === 1 && (unit.value === 1e3 || unit.value === 1e6)) {
-        // حالات خاصة للألف والمليون
+
+      // المفرد والمثنى يُذكران وحدهما: "ألف" / "ألفان" / "مليار" / "ملياران"
+      if (count <= 2) {
         parts.push(scaleWord);
+      } else if (count < 1000) {
+        parts.push(convertThreeDigits(count) + ' ' + scaleWord);
       } else {
-        parts.push(countText + ' ' + scaleWord);
+        // عدد كبير من وحدة القياس: يُختصر إلى "مليارات" مع رقم
+        parts.push(convertThreeDigits(count) + ' ' + unit.plural);
       }
-      
+
       remainingNum %= unit.value;
     }
   }
@@ -140,15 +146,15 @@ const convertIntegerToArabic = (num: number): string => {
 // تحويل الأرقام إلى كلمات باللغة الفرنسية مع دعم المبالغ الكبيرة
 export const numberToFrenchWords = (num: number, currency: string = 'Dinar Algérien', decimalCurrency: string = 'Centime'): string => {
   if (isNaN(num) || !isFinite(num)) return '';
-  
+
   // التحقق من الحد الأقصى المدعوم
   if (Math.abs(num) >= 1e18) {
-    throw new Error('Nombre trop grand. Maximum supporté: 999 quadrillions');
+    return 'Nombre trop grand non pris en charge';
   }
-  
+
   const parts = Math.abs(num).toFixed(2).split('.');
-  const integerPart = parseInt(parts[0]);
-  const decimalPart = parseInt(parts[1]);
+  const integerPart = parseInt(parts[0], 10);
+  const decimalPart = parseInt(parts[1], 10);
 
   let result = '';
 
@@ -310,10 +316,8 @@ const convertLessThanOneHundred = (n: number): string => {
 };
 
 // دوال مساعدة إضافية
-export const formatNumber = (num: number): string => {
-  return num.toLocaleString('ar-DZ');
-};
 
+/** يتحقق من أن الرقم صالح وقابل للتحويل إلى كلمات */
 export const validateNumber = (num: number): boolean => {
   return !isNaN(num) && isFinite(num) && Math.abs(num) < 1e18;
 };

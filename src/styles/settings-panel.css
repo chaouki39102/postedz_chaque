@@ -1,0 +1,512 @@
+/*
+ * واجهة الإعدادات: تصميم واحد مكتوب يدوياً لا مجموعة أصناف جاهزة.
+ *
+ * لماذا ملف خاص بدل أصناف Tailwind داخل المكوّن:
+ * 1) المقاس ثابت بمتغير واحد، وذلك شرط ثابت لا يمكن التعبير عنه
+ *    بفئة واحدة دون تكرارها على كل عنصر.
+ * 2) التبويبات عمودية بخط شعري وأرقام بخط أحادي المسافة، وهذا تفصيل
+ *    صغير هو ما يميّز الواجهة عن القالب.
+ * 3) الألوان مشتقة من متغيرات الوضع الداكن في index.css، فتبقى
+ *    اللوحة متوافقة مع الوضع الفاتح والداكن دون صنفين لكل لون.
+ *
+ * البادئة sp- (settings panel) لأنها مساحة الأسماء هذه وحدها.
+ */
+
+.sp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(8px, 2vw, 28px);
+  background: color-mix(in srgb, #0b1220 62%, transparent);
+  backdrop-filter: blur(3px);
+}
+
+/*
+ * مقاس ثابت: نفس العرض ونفس الارتفاع مهما كان التبويب.
+ * الارتفاع معرّف هنا وحده (--sp-height) و sp-pane يأخذ الباقي.
+ */
+.sp-shell {
+  --sp-height: min(680px, calc(100vh - 2 * clamp(8px, 2vw, 28px)));
+  --sp-rail-width: 208px;
+  --sp-radius: 4px;
+  --sp-line: color-mix(in srgb, var(--text-color-dark) 14%, transparent);
+  --sp-line-strong: color-mix(in srgb, var(--text-color-dark) 26%, transparent);
+  --sp-ink: var(--text-color-dark);
+  --sp-muted: color-mix(in srgb, var(--text-color-dark) 58%, transparent);
+  --sp-panel: color-mix(in srgb, var(--text-color-light) 4%, #ffffff);
+  --sp-accent: #b4823a;
+  --sp-accent-soft: color-mix(in srgb, #b4823a 16%, transparent);
+
+  display: flex;
+  flex-direction: column;
+  width: min(1080px, 100%);
+  height: var(--sp-height);
+  overflow: hidden;
+  border: 1px solid var(--sp-line-strong);
+  border-radius: var(--sp-radius);
+  background: var(--sp-panel);
+  color: var(--sp-ink);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #ffffff 70%, transparent) inset,
+    0 24px 60px -20px rgb(0 0 0 / 45%);
+}
+
+/* الوضع الداكن: نحاس أفتح قليلاً يبقى مقروءاً على خلفية داكنة */
+html.dark .sp-shell {
+  --sp-panel: #14181d;
+  --sp-line: rgb(255 255 255 / 10%);
+  --sp-line-strong: rgb(255 255 255 / 18%);
+  --sp-accent: #d9a55a;
+}
+
+/* ---- الرأس ---- */
+
+.sp-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px 15px;
+  border-bottom: 1px solid var(--sp-line);
+}
+
+/*
+ * خط نحاسي رفيح على طول الرأس: إشارة واحدة للوحة لا تكرار لها في
+ * الداخل. لونه لا يتغيّر بالوضع الداكن فيبقى معياراً بصرياً واحداً.
+ */
+.sp-head__rule {
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--sp-accent), color-mix(in srgb, var(--sp-accent) 12%, transparent));
+}
+
+.sp-head__text {
+  min-width: 0;
+  flex: 1;
+}
+
+.sp-head__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.sp-head__sub {
+  margin: 3px 0 0;
+  font-size: 11.5px;
+  color: var(--sp-muted);
+}
+
+.sp-head__close {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius);
+  background: transparent;
+  color: var(--sp-muted);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+}
+
+.sp-head__close:hover {
+  color: var(--sp-ink);
+  border-color: var(--sp-line-strong);
+  background: color-mix(in srgb, var(--sp-ink) 5%, transparent);
+}
+
+/* ---- الجسم: الشريط الجانبي + المحتوى ---- */
+
+.sp-body {
+  display: grid;
+  grid-template-columns: var(--sp-rail-width) minmax(0, 1fr);
+  min-height: 0;
+  flex: 1;
+}
+
+.sp-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 12px 10px;
+  border-inline-end: 1px solid var(--sp-line);
+  background: color-mix(in srgb, var(--sp-ink) 3%, transparent);
+  overflow-y: auto;
+}
+
+.sp-rail__item {
+  display: grid;
+  grid-template-columns: 22px 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border: 0;
+  border-inline-start: 2px solid transparent;
+  border-radius: 0 var(--sp-radius) var(--sp-radius) 0;
+  background: transparent;
+  color: var(--sp-muted);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.sp-rail__item:hover {
+  color: var(--sp-ink);
+  background: color-mix(in srgb, var(--sp-ink) 4%, transparent);
+}
+
+/* التبويب المفتوح: خط ناحٍ على الحافة وظل خفيف — لا تعبئة لونية */
+.sp-rail__item[aria-current='true'] {
+  color: var(--sp-ink);
+  border-inline-start-color: var(--sp-accent);
+  background: var(--sp-accent-soft);
+  font-weight: 700;
+}
+
+.sp-rail__index {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--sp-ink) 34%, transparent);
+}
+
+.sp-rail__item[aria-current='true'] .sp-rail__index {
+  color: var(--sp-accent);
+}
+
+.sp-rail__icon {
+  display: grid;
+  place-items: center;
+}
+
+.sp-rail__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * المحتوى: الارتفاع ثابت من `--sp-height` والعرض يأخذ ما تبقى من
+ * العرض. `overflow: auto` وحده هو ما يتغيّر بارتفاع المحتوى، فالنافذة
+ * لا تتبدّل أبعادها عند الانتقال بين تبويب وآخر.
+ */
+.sp-pane {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 22px 26px 28px;
+  scrollbar-gutter: stable;
+}
+
+.sp-pane::-webkit-scrollbar {
+  width: 10px;
+}
+
+.sp-pane::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--sp-ink) 22%, transparent);
+  background-clip: content-box;
+}
+
+.sp-pane::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--sp-ink) 38%, transparent);
+  background-clip: content-box;
+}
+
+/* ---- تبويب الطباعة ---- */
+
+.sp-print__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.sp-print__side {
+  display: grid;
+  gap: 18px;
+}
+
+.sp-card {
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius);
+  padding: 16px 16px 14px;
+  background: color-mix(in srgb, var(--sp-ink) 2%, transparent);
+}
+
+.sp-card__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 4px;
+}
+
+.sp-card__icon {
+  width: 16px;
+  height: 16px;
+  color: var(--sp-accent);
+}
+
+.sp-card__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.sp-card__hint {
+  margin: 0 0 14px;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--sp-muted);
+}
+
+.sp-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sp-line);
+}
+
+.sp-field + .sp-field {
+  margin-top: 16px;
+}
+
+.sp-field__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+
+.sp-field__label {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* الرقم مقروء من اليمين: الأرقام بخط أحادي المسافة وعرض ثابت */
+.sp-field__value {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--sp-accent);
+  direction: ltr;
+}
+
+.sp-field__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sp-field__note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--sp-muted);
+}
+
+.sp-input {
+  width: 96px;
+  flex: none;
+  padding: 7px 9px;
+  border: 1px solid var(--sp-line-strong);
+  border-radius: var(--sp-radius);
+  background: color-mix(in srgb, var(--sp-ink) 4%, transparent);
+  color: var(--sp-ink);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  direction: ltr;
+  text-align: right;
+}
+
+.sp-input:focus-visible {
+  outline: 2px solid var(--sp-accent);
+  outline-offset: 1px;
+}
+
+/* منزلق نحيل: مقبض مربع وخط 3px، لا المسار الافتراضي للمتصفح */
+.sp-range {
+  flex: 1;
+  min-width: 0;
+  height: 18px;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  direction: ltr;
+}
+
+.sp-range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--sp-ink) 16%, transparent);
+}
+
+.sp-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -5px;
+  border: 1px solid color-mix(in srgb, var(--sp-ink) 30%, transparent);
+  border-radius: 2px;
+  background: var(--sp-accent);
+}
+
+.sp-range::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--sp-ink) 16%, transparent);
+}
+
+.sp-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 1px solid color-mix(in srgb, var(--sp-ink) 30%, transparent);
+  border-radius: 2px;
+  background: var(--sp-accent);
+}
+
+.sp-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border: 1px solid var(--sp-line-strong);
+  border-radius: var(--sp-radius);
+  background: transparent;
+  color: var(--sp-ink);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, opacity 120ms ease;
+}
+
+.sp-button:hover:not(:disabled) {
+  border-color: var(--sp-accent);
+  background: var(--sp-accent-soft);
+}
+
+.sp-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.sp-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 16px;
+  font-size: 11.5px;
+  color: var(--sp-accent);
+}
+
+/* ---- مخطط الورقة ---- */
+
+.sp-diagram {
+  margin: 0;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius);
+  padding: 12px;
+  background: color-mix(in srgb, var(--sp-ink) 2%, transparent);
+}
+
+.sp-diagram svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sp-diagram__sheet {
+  fill: color-mix(in srgb, var(--sp-ink) 3%, transparent);
+  stroke: var(--sp-line-strong);
+  stroke-width: 2;
+}
+
+.sp-diagram__grid {
+  stroke: color-mix(in srgb, var(--sp-ink) 8%, transparent);
+  stroke-width: 1;
+}
+
+/* الشيك: خط متصل وليس تعبئة، فهو إطار يوضّح الموضع لا تصميم */
+.sp-diagram__cheque {
+  fill: var(--sp-accent-soft);
+  stroke: var(--sp-accent);
+  stroke-width: 2;
+}
+
+/* خط المبلغ: منفرد ونحيل ليقرأ على الشبكة */
+.sp-diagram__amount {
+  stroke: color-mix(in srgb, var(--sp-ink) 55%, transparent);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+
+.sp-diagram__caption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--sp-muted);
+}
+
+.sp-diagram__caption b {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--sp-ink);
+  direction: ltr;
+  display: inline-block;
+}
+
+/* ---- تضييق الشاشة: الشريط يصير أفقياً والتبويبات تبقى ---- */
+
+@media (max-width: 860px) {
+  .sp-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .sp-rail {
+    flex-direction: row;
+    overflow-x: auto;
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--sp-line);
+  }
+
+  .sp-rail__item {
+    border-inline-start: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: var(--sp-radius) var(--sp-radius) 0 0;
+    white-space: nowrap;
+  }
+
+  .sp-rail__item[aria-current='true'] {
+    border-inline-start-color: transparent;
+    border-bottom-color: var(--sp-accent);
+  }
+
+  .sp-print__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sp-pane {
+    padding: 16px;
+  }
+}

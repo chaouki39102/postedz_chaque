@@ -1,30 +1,11 @@
 /** @type {import('tailwindcss').Config} */
-// export default {
-//   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
-//   theme: {
-//     extend: {
-//       fontFamily: {
-//         'cairo': ['Cairo', 'sans-serif'],
-//       },
-//       animation: {
-//         'float': 'float 6s ease-in-out infinite',
-//         'pulse-glow': 'pulse-glow 2s infinite',
-//         'slide-in': 'slideIn 0.8s ease-out',
-//         'fade-in': 'fadeIn 1s ease-out',
-//       },
-//       backdropBlur: {
-//         'xs': '2px',
-//       }
-//     },
-//   },
-//   plugins: [],
-// };
-
-module.exports = {
+export default {
+  // الوضع الداكن عبر class على <html> (يتحكم به useDarkMode)
   darkMode: 'class',
   content: [
-    "./src/**/*.{js,jsx,ts,tsx}",
-    "./public/index.html"
+    // index.html موجود في جذر المشروع وليس في public
+    './index.html',
+    './src/**/*.{js,jsx,ts,tsx}',
   ],
   theme: {
     extend: {
@@ -37,7 +18,10 @@ module.exports = {
         error: 'var(--color-error)',
         info: 'var(--color-info)',
       },
+      fontFamily: {
+        cairo: ['Cairo', 'sans-serif'],
+      },
     },
   },
   plugins: [],
-}
+};

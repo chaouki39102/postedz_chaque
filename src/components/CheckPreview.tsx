@@ -1,447 +1,370 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
-import { Printer, Eye, Sparkles, Move, Lock, Unlock } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Printer, Eye, Sparkles, Move, Lock, Unlock, RotateCcw, Bookmark, Pencil, X } from 'lucide-react';
+import { numberToArabicWords, numberToFrenchWords, validateNumber } from '../utils/numberToWords';
+import { formatDateNumeric } from '../utils/date';
+import { CHECK_FIELDS } from '../types';
+import { useLabelProxy } from '../context/labelsCore';
+import { loadPreference, savePreference } from '../utils/storage';
 import {
-  numberToArabicWords,
-  numberToFrenchWords,
-} from "../utils/numberToWords";
-import { CheckData, Position, Language, Bank } from "../types";
+  printCheck,
+  FIELD_FONT_CQW,
+  AMOUNT_WORDS_FONT_CQW,
+  type PrintedField,
+  type PrintLayout,
+} from '../utils/printCheck';
+import type { CheckData, Position, PositionMap, Language, Bank, Preset } from '../types';
 
-const CheckPreview: React.FC<{
+/** العناصر القابلة للسحب على الشيك */
+type FieldId = (typeof CHECK_FIELDS)[number];
+
+/** نستخدم أسماء الحقول نفسها كمعرّفات، مع الاحتفاظ بالأنواع */
+const FIELD = {
+  date: 'date',
+  place: 'place',
+  beneficiary: 'beneficiary',
+  amount: 'amount',
+  amountWords: 'amountWords',
+} as const satisfies Record<FieldId, FieldId>;
+
+/** العناصر المحاذاة لليمين بدل اليسار */
+const RIGHT_ALIGNED: ReadonlySet<FieldId> = new Set<FieldId>([FIELD.beneficiary, FIELD.amountWords]);
+
+/** حدود حركة السحب (نسبة مئوية) */
+const MIN_OFFSET = -100;
+const MAX_OFFSET = 200;
+
+/** حدود عرض نص المبلغ بالحروف (نسبة مئوية من عرض الشيك) */
+const MIN_WIDTH_PERCENT = 10;
+const MAX_WIDTH_PERCENT = 95;
+const DEFAULT_WIDTH_PERCENT = 50;
+
+/** عرض ورقة الشيك الحقيقي 210mm بالبكسل عند 96dpi (نسبة CSS) */
+const PRINT_WIDTH_PX = (210 * 96) / 25.4;
+
+/** تفضيل: طباعة الحقول فقط دون صورة البنك (الشيك في الطابعة فارغ) */
+const PRINT_TEXT_ONLY_KEY = 'print_text_only';
+
+/**
+ * يحدّ عرض المبلغ بالحروف إلى نطاق صالح.
+ *
+ * العرض نسبة مئوية من عرض الشيك وليس بكسل، لأن العرض بالبكسل كان يجعل
+ * الالتفاف مختلفاً بين المعاينة (≈900px) والطباعة (210mm ≈ 794px)،
+ * فيخرج النص المطبوع غير مطابق للمعاينة.
+ */
+const clampWidthPercent = (value: number | undefined): number => {
+  if (value === undefined || !Number.isFinite(value)) return DEFAULT_WIDTH_PERCENT;
+  return Math.min(MAX_WIDTH_PERCENT, Math.max(MIN_WIDTH_PERCENT, value));
+};
+
+/**
+ * ألوان العناصر قابلة للتحليل (scannable) بواسطة Tailwind.
+ * لا تستخدم أسماء أصناف ديناميكية مثل `bg-${color}-100` لأن Tailwind
+ * لا يولّدها وقت البناء فتختفي كل التنسيقات بصمت.
+ */
+const FIELD_THEME: Record<FieldId, { hover: string; active: string; badge: string }> = {
+  [FIELD.date]: {
+    hover: 'hover:bg-blue-100/70 hover:border-blue-500 dark:hover:bg-blue-900/30',
+    active: 'bg-blue-200/80 dark:bg-blue-800/50 border-2 border-blue-600 dark:border-blue-400',
+    badge: 'text-blue-600 dark:text-blue-400',
+  },
+  [FIELD.place]: {
+    hover: 'hover:bg-green-100/70 hover:border-green-500 dark:hover:bg-green-900/30',
+    active: 'bg-green-200/80 dark:bg-green-800/50 border-2 border-green-600 dark:border-green-400',
+    badge: 'text-green-600 dark:text-green-400',
+  },
+  [FIELD.beneficiary]: {
+    hover: 'hover:bg-purple-100/70 hover:border-purple-500 dark:hover:bg-purple-900/30',
+    active: 'bg-purple-200/80 dark:bg-purple-800/50 border-2 border-purple-600 dark:border-purple-400',
+    badge: 'text-purple-600 dark:text-purple-400',
+  },
+  [FIELD.amount]: {
+    hover: 'hover:bg-yellow-100/70 hover:border-yellow-500 dark:hover:bg-yellow-900/30',
+    active: 'bg-yellow-200/80 dark:bg-yellow-800/50 border-2 border-yellow-600 dark:border-yellow-400',
+    badge: 'text-yellow-600 dark:text-yellow-400',
+  },
+  [FIELD.amountWords]: {
+    hover: 'hover:bg-orange-100/70 hover:border-orange-500 dark:hover:bg-orange-900/30',
+    active: 'bg-orange-200/80 dark:bg-orange-800/50 border-2 border-orange-600 dark:border-orange-400',
+    badge: 'text-orange-600 dark:text-orange-400',
+  },
+};
+
+const formatCurrency = (num: number): string =>
+  num.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const clamp = (value: number, min: number, max: number): number =>
+  Math.max(min, Math.min(max, value));
+
+interface CheckPreviewProps {
   checkData: CheckData;
-  positions: Record<string, Position>;
-  setPositions: (positions: Record<string, Position>) => void;
+  positions: PositionMap;
+  setPositions: (updater: (current: PositionMap) => PositionMap) => void;
   language: Language;
   bank: Bank;
-}> = ({ checkData, positions, setPositions, language, bank }) => {
-  const [draggedElement, setDraggedElement] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [initialPosition, setInitialPosition] = useState({ x: 0, y: 0 });
-  const [isLocked, setIsLocked] = useState(false);
+  isLocked: boolean;
+  onToggleLock: () => void;
+  onResetPositions: () => void;
+  presets: Preset[];
+  onApplyPreset: (preset: Preset) => void;
+  onDeletePreset: (id: string) => void;
+  onRenamePreset: (preset: Preset, name: string) => void | Promise<void>;
+  onPrint?: () => void;
+  /** موضع الشيك على الورقة (من واجهة الطباعة) */
+  printLayout?: PrintLayout;
+}
+
+const CheckPreview: React.FC<CheckPreviewProps> = ({
+  checkData,
+  positions,
+  setPositions,
+  language,
+  bank,
+  isLocked,
+  onToggleLock,
+  onResetPositions,
+  presets,
+  onApplyPreset,
+  onDeletePreset,
+  onRenamePreset,
+  onPrint,
+  printLayout,
+}) => {
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [draggedElement, setDraggedElement] = useState<FieldId | null>(null);
+  const [printTextOnly, setPrintTextOnly] = useState(
+    () => loadPreference(PRINT_TEXT_ONLY_KEY) === '1'
+  );
+
   const checkRef = useRef<HTMLDivElement>(null);
+  const dragStateRef = useRef<{
+    field: FieldId;
+    startX: number;
+    startY: number;
+    origin: Position;
+  } | null>(null);
+  const frameRef = useRef<number | null>(null);
 
-  const labels = {
-    ar: {
-      preview: "معاينة الشيك",
-      locked: "مقفل",
-      unlocked: "مفتوح",
-      reset: "إعادة تعيين",
-      print: "طباعة",
-      dragIndicator: "جاري السحب...",
-      positionTips: "تعليمات التحكم المحسنة",
-      editMode: "وضع التحرير",
-      drag: "السحب",
-      lockMode: "وضع القفل",
-      resetPos: "إعادة تعيين",
-      amountInWords: "المبلغ بالحروف",
-      autoConvert: "تم التحويل تلقائياً بواسطة النظام الذكي",
-      printTips: "نصائح الطباعة",
-      printTip1: "سيتم طباعة النصوص فقط على الشيك الحقيقي",
-      printTip2: "تأكد من وضع الشيك بشكل صحيح في الطابعة",
-      printTip3: "النصوص ستظهر بالمواضع المحددة بدقة",
-      checkData: "بيانات الشيك",
-      date: "التاريخ:",
-      place: "مكان التحرير:",
-      beneficiary: "المستفيد:",
-      amount: "المبلغ:",
-      amountInWordsLabel: "المبلغ بالحروف:",
-      currency: "",
-      currencyWords: "",
-      dragTitle: "اسحب لتغيير الموضع",
-      lockedTitle: "مقفل - اضغط على زر الفتح للتحرير",
-    },
-    fr: {
-      preview: "Aperçu du chèque",
-      locked: "Verrouillé",
-      unlocked: "Déverrouillé",
-      reset: "Réinitialiser",
-      print: "Imprimer",
-      dragIndicator: "Glissement en cours...",
-      positionTips: "Instructions de contrôle améliorées",
-      editMode: "Mode édition",
-      drag: "Glisser",
-      lockMode: "Mode verrouillage",
-      resetPos: "Réinitialiser",
-      amountInWords: "Montant en lettres",
-      autoConvert: "Converti automatiquement par le système intelligent",
-      printTips: "Conseils d'impression",
-      printTip1: "Seuls les textes seront imprimés sur le vrai chèque",
-      printTip2:
-        "Assurez-vous de placer le chèque correctement dans l'imprimante",
-      printTip3:
-        "Les textes apparaîtront aux positions définies avec précision",
-      checkData: "Données du chèque",
-      date: "Date:",
-      place: "Lieu:",
-      beneficiary: "Bénéficiaire:",
-      amount: "Montant:",
-      amountInWordsLabel: "Montant en lettres:",
-      currency: "",
-      currencyWords: "",
-      dragTitle: "Glisser pour changer la position",
-      lockedTitle:
-        "Verrouillé - Cliquez sur le bouton de déverrouillage pour éditer",
-    },
-  };
+  // النصوص تأتي من جدول labels في قاعدة البيانات (انظر src/data/labelSeeds.ts)
+  const currentLabels = useLabelProxy('preview.');
 
-  const currentLabels = labels[language];
+  /**
+   * المواضع مؤقتة أثناء السحب في ref بدل state، لتجنّب إعادة ربط
+   * مستمعي mousemove على كل حركة مؤشر.
+   */
+  const positionsRef = useRef(positions);
+  positionsRef.current = positions;
 
-  const formatCurrency = (num: number): string => {
-    return num.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  };
+  const dateText = useMemo(() => formatDateNumeric(checkData.date), [checkData.date]);
 
-  const formatDate = (dateString: string): string => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    if (language === "ar") {
-      const day = date.getDate().toString().padStart(2, "0");
-      const month = (date.getMonth() + 1).toString().padStart(2, "0");
-      const year = date.getFullYear();
-      return `${day}/${month}/${year}`;
-    } else {
-      return date.toLocaleDateString("fr-FR");
-    }
-  };
-
-  const getAmountInWords = (): string => {
-    if (!checkData.amount || isNaN(Number(checkData.amount))) return "";
+  const amountInWords = useMemo(() => {
     const amount = Number(checkData.amount);
-    return language === "ar"
-      ? numberToArabicWords(amount)
-      : numberToFrenchWords(amount);
-  };
+    if (!checkData.amount || !validateNumber(amount)) return '';
+    return language === 'ar' ? numberToArabicWords(amount) : numberToFrenchWords(amount);
+  }, [checkData.amount, language]);
+
+  const amountNumeric = useMemo(() => {
+    const amount = Number(checkData.amount);
+    return checkData.amount && validateNumber(amount) ? formatCurrency(amount) : '';
+  }, [checkData.amount]);
+
+  const amountIsUnsupported = useMemo(() => {
+    if (!checkData.amount) return false;
+    return !validateNumber(Number(checkData.amount));
+  }, [checkData.amount]);
+
+  const commitDragPosition = useCallback(
+    (field: FieldId, x: number, y: number) => {
+      setPositions((current) => ({
+        ...current,
+        [field]: { ...current[field], x, y },
+      }));
+    },
+    [setPositions]
+  );
 
   const handleMouseDown = useCallback(
-    (e: React.MouseEvent, elementType: string) => {
+    (event: React.MouseEvent, field: FieldId) => {
       if (isLocked) return;
 
-      e.preventDefault();
-      e.stopPropagation();
+      event.preventDefault();
+      event.stopPropagation();
 
-      const checkRect = checkRef.current?.getBoundingClientRect();
-      if (!checkRect) return;
+      if (!checkRef.current) return;
 
-      setDraggedElement(elementType);
-      setIsDragging(true);
-      setDragStart({ x: e.clientX, y: e.clientY });
-      setInitialPosition(positions[elementType] || { x: 0, y: 0 });
+      dragStateRef.current = {
+        field,
+        startX: event.clientX,
+        startY: event.clientY,
+        origin: { ...(positionsRef.current[field] ?? { x: 0, y: 0 }) },
+      };
+      setDraggedElement(field);
 
-      document.body.style.userSelect = "none";
-      document.body.style.cursor = "grabbing";
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'grabbing';
     },
-    [isLocked, positions]
+    [isLocked]
   );
 
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!isDragging || !draggedElement || !checkRef.current) return;
-
-      e.preventDefault();
-
-      const checkRect = checkRef.current.getBoundingClientRect();
-      const deltaX = e.clientX - dragStart.x;
-      const deltaY = e.clientY - dragStart.y;
-
-      let deltaXPercent = (deltaX / checkRect.width) * 100;
-      let deltaYPercent = (deltaY / checkRect.height) * 100;
-
-      // Only negate deltaX for right-aligned elements in the context of dragging
-      // The renderDraggableElement will correctly apply 'right' and transform: translate(50%, -50%)
-      if (
-        draggedElement === "beneficiary" ||
-        draggedElement === "amountWords"
-      ) {
-        deltaXPercent = -deltaXPercent;
-      }
-
-      const newX = Math.max(
-        -100,
-        Math.min(200, initialPosition.x + deltaXPercent)
-      );
-      const newY = Math.max(
-        -100,
-        Math.min(200, initialPosition.y + deltaYPercent)
-      );
-
-      setPositions({
-        ...positions,
-        [draggedElement]: {
-          ...positions[draggedElement],
-          x: Math.round(newX),
-          y: Math.round(newY),
-        },
-      });
-    },
-    [
-      isDragging,
-      draggedElement,
-      dragStart,
-      initialPosition,
-      positions,
-      setPositions,
-    ]
-  );
-
-  const handleMouseUp = useCallback(() => {
-    if (isDragging) {
-      setIsDragging(false);
-      setDraggedElement(null);
-      document.body.style.userSelect = "";
-      document.body.style.cursor = "";
+  const stopDragging = useCallback(() => {
+    if (frameRef.current !== null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
     }
-  }, [isDragging]);
+    dragStateRef.current = null;
+    setDraggedElement(null);
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+  }, []);
 
   useEffect(() => {
-    if (isDragging) {
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
+    if (!draggedElement) return;
 
-      return () => {
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", handleMouseUp);
-      };
-    }
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+    const handleMouseMove = (event: MouseEvent) => {
+      const drag = dragStateRef.current;
+      const container = checkRef.current;
+      if (!drag || !container) return;
 
-  const handlePrint = () => {
-    document.body.classList.add("printing-mode");
+      event.preventDefault();
 
-    const checkElement = document.getElementById("check-preview");
-    if (!checkElement) {
-      alert(
-        language === "ar"
-          ? "خطأ: لا يمكن العثور على منطقة الشيك"
-          : "Erreur: Zone de chèque introuvable"
-      );
-      return;
-    }
+      // نؤجل الاستدعاء إلى الإطار التالي لتقليل إعادة الرسم
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+      frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = null;
+        const rect = container.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
 
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      alert(
-        language === "ar"
-          ? "خطأ: تم حظر النافذة المنبثقة"
-          : "Erreur: Pop-up bloqué"
-      );
-      return;
-    }
+        let deltaX = ((event.clientX - drag.startX) / rect.width) * 100;
+        const deltaY = ((event.clientY - drag.startY) / rect.height) * 100;
 
-    const amountWordsMaxWidth = positions.amountWords?.width
-      ? `${positions.amountWords.width}px`
-      : "auto";
+        // العناصر المحاذاة لليمين تتحرك عكسياً
+        if (RIGHT_ALIGNED.has(drag.field)) deltaX = -deltaX;
 
-    const printContent = `
-      <!DOCTYPE html>
-      <html dir="${language === "ar" ? "rtl" : "ltr"}">
-      <head>
-        <meta charset="UTF-8">
-        <title>${
-          language === "ar" ? "طباعة الشيك" : "Impression du chèque"
-        }</title>
-        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-        <style>
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Cairo', Arial, sans-serif;
-          }
-          
-          @page {
-            size: A4 landscape;
-            margin: 70mm 50mm;
-          }
-          
-          body {
-            background: transparent;
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-          }
-          
-          .check-container {
-            position: relative;
-            width: 210mm;
-            height: 99mm;
-            background-image: url('${bank.checkImageUrl}') !important;
-            background-size: contain !important;
-            background-repeat: no-repeat !important;
-            background-position: center !important;
-            page-break-inside: avoid;
-          }
-          
-          .text-element {
-            position: absolute;
-            color: #000000;
-            font-family: 'Cairo', Arial, sans-serif;
-            font-weight: bold;
-            white-space: nowrap;
-            line-height: 1.2;
-            background: transparent;
-          }
-          
-          .date { font-size: 12pt; }
-          .place { font-size: 12pt; }
-          .beneficiary { 
-            font-size: 13pt; 
-            font-weight: 600; 
-          }
-          .amount { font-size: 12pt; }
-          .amount-words { 
-            font-size: 11pt; 
-            max-width: ${amountWordsMaxWidth};
-            word-wrap: break-word; 
-            white-space: normal; 
-            line-height: 1.1; 
-          }
-          
-          * {
-            background-image: none !important;
-            background-color: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            text-shadow: none !important;
-          }
-          
-          @media print {
-            body {
-              display: flex !important;
-              justify-content: center !important;
-              align-items: center !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              height: 100vh !important;
-            }
-            
-            .check-container {
-              margin: 0 !important;
-              position: relative !important;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="check-container">
-          ${
-            checkData.date
-              ? `<div class="text-element date" style="left: ${
-                  positions.date?.x || 0
-                }%; top: ${
-                  positions.date?.y || 0
-                }%; transform: translate(-50%, -50%);">${formatDate(
-                  checkData.date
-                )}</div>`
-              : ""
-          }
-          ${
-            checkData.place
-              ? `<div class="text-element place" style="left: ${
-                  positions.place?.x || 0
-                }%; top: ${
-                  positions.place?.y || 0
-                }%; transform: translate(-50%, -50%);">${checkData.place}</div>`
-              : ""
-          }
-          ${
-            checkData.beneficiary
-              ? `<div class="text-element beneficiary" style="right: ${
-                  positions.beneficiary?.x || 0
-                }%; top: ${
-                  positions.beneficiary?.y || 0
-                }%; transform: translate(50%, -50%);">${
-                  checkData.beneficiary
-                }</div>`
-              : ""
-          }
-          ${
-            checkData.amount
-              ? `<div class="text-element amount" style="left: ${
-                  positions.amount?.x || 0
-                }%; top: ${
-                  positions.amount?.y || 0
-                }%; transform: translate(-50%, -50%);">${formatCurrency(
-                  Number(checkData.amount)
-                )} ${currentLabels.currency}</div>`
-              : ""
-          }
-          ${
-            checkData.amount
-              ? `<div class="text-element amount-words" style="right: ${
-                  positions.amountWords?.x || 0
-                }%; top: ${
-                  positions.amountWords?.y || 0
-                }%; transform: translate(50%, -50%);">${getAmountInWords()} ${
-                  currentLabels.currencyWords
-                }</div>`
-              : ""
-          }
-        </div>
-      </body>
-      </html>
-    `;
-
-    printWindow.document.write(printContent);
-    printWindow.document.close();
-
-    printWindow.onload = () => {
-      setTimeout(() => {
-        printWindow.print();
-        setTimeout(() => {
-          printWindow.close();
-          document.body.classList.remove("printing-mode");
-        }, 1000);
-      }, 500);
+        commitDragPosition(
+          drag.field,
+          Math.round(clamp(drag.origin.x + deltaX, MIN_OFFSET, MAX_OFFSET)),
+          Math.round(clamp(drag.origin.y + deltaY, MIN_OFFSET, MAX_OFFSET))
+        );
+      });
     };
-  };
 
-  const resetPositions = () => {
-    setPositions(bank.initialPositions[language]);
-  };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', stopDragging);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', stopDragging);
+    };
+  }, [draggedElement, commitDragPosition, stopDragging]);
+
+  // تنظيف عند إزالة المكوّن أثناء السحب
+  useEffect(() => stopDragging, [stopDragging]);
+
+  /*
+   * قياسات الطباعة الاحتياطية (زر المتصفح): العرض الحالي للمعاينة
+   * بالبكسل + معامل التكبير الذي يجعله 210mm على الورقة.
+   *
+   * الفكرة: تخطيط الطباعة = تخطيط المعاينة بالبكسل تماماً (نفس حجم
+   * الخط بـ cqw، نفس الحشو، نفس العرض المحدد) ثم تكبير بصري إلى
+   * 210mm. لو فرضنا 210mm على التخطيط مباشرة لاختلف تقريب عرض كل
+   * حرف قليلاً فيقفز نص المبلغ بالحروف من ثلاثة أسطر إلى سطرين.
+   */
+  useEffect(() => {
+    const box = checkRef.current;
+    if (!box) return;
+
+    const update = () => {
+      /*
+       * clientWidth هو عرض التخطيط، لا العرض البصري بعد transform.
+       * قياس getBoundingClientRect في وسائط الطباعة يقرأ العرض
+       * المكبَّر فيحسب المعامل خطأً ويساوي واحداً.
+       */
+      const width = box.clientWidth;
+      if (width <= 0) return;
+      box.style.setProperty('--print-w', `${width}px`);
+      box.style.setProperty('--print-h', `${(width * 99) / 210}px`);
+      box.style.setProperty('--print-k', String(PRINT_WIDTH_PX / width));
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(box);
+    window.addEventListener('resize', update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, []);
 
   const renderDraggableElement = (
-    elementType: string,
+    field: FieldId,
     value: string,
-    colorClass: string,
-    position: Position,
-    isRightAligned = false // تم استخدام هذه القيمة الآن بشكل صحيح
+    position: Position
   ) => {
     if (!value) return null;
 
+    const theme = FIELD_THEME[field];
+    const isRightAligned = RIGHT_ALIGNED.has(field);
+    const isActive = draggedElement === field;
+    const isWrapping = field === FIELD.amountWords;
+
     return (
       <div
-        className={`absolute text-sm font-bold text-black dark:text-white select-none drop-shadow-sm transition-all duration-200 px-3 py-1.5 rounded-lg print-text ${
-          !isLocked
-            ? `cursor-grab hover:bg-${colorClass}-100/70 dark:hover:bg-${colorClass}-900/30 hover:border-2 hover:border-${colorClass}-500`
-            : "cursor-default"
-        } ${
-          draggedElement === elementType
-            ? `bg-${colorClass}-200/80 dark:bg-${colorClass}-800/50 border-2 border-${colorClass}-600 dark:border-${colorClass}-400 shadow-lg scale-105 z-50`
-            : ""
-        }`}
+        className={[
+          // حجم الخط يأتي من style المقياس cqw، لذا نزيل text-sm الذي يُلغي
+          // التتام مع الأساس ويستخدم حجماً ثابتاً بالبكسل
+          'absolute font-bold text-black select-none',
+          'transition-all duration-200 rounded-lg print-text',
+          /*
+           * المبلغ بالحروف: بدون حشو أفقي إطلاقاً.
+           * الحشو كان يسرق مساحة من العرض المحدد، فيقلّ الالتفاف في
+           * المعاينة عن الطباعة (لأن box-sizing يشمل الحشو داخل العرض).
+           * التمييز البصري يأتي من لون الخلفية عند التحويم، ولا يؤثر على التخطيط.
+           */
+          isWrapping
+            ? 'py-1'
+            : 'px-3 py-1.5 drop-shadow-sm',
+          isLocked ? 'cursor-default' : `cursor-grab ${theme.hover}`,
+          isActive ? `${theme.active} shadow-lg z-50` : '',
+        ].filter(Boolean).join(' ')}
         style={{
-          [isRightAligned ? 'right' : 'left']: `${position.x}%`, // تم التغيير هنا
+          [isRightAligned ? 'right' : 'left']: `${position.x}%`,
           top: `${position.y}%`,
-          transform: `translate(${isRightAligned ? '50%' : '-50%'}, -50%)`, // تم التغيير هنا
-          fontFamily: "Cairo, sans-serif",
-          maxWidth: position.width ? `${position.width}px` : "none",
-          whiteSpace: elementType === "amountWords" ? "normal" : "nowrap",
-          wordBreak: elementType === "amountWords" ? "break-word" : "normal",
-          width: elementType === "amountWords" && position.width ? `${position.width}px` : "auto"
+          transform: `translate(${isRightAligned ? '50%' : '-50%'}, -50%)`,
+          fontFamily: 'Cairo, sans-serif',
+          /*
+           * أحجام الخطوط بوحدة cqw (1% من عرض الشيك) لا بوحدة px.
+           * هذا هو مفتاح تطابق المعاينة مع الطباعة: العرض متطابق (210mm)
+           * وحجم الخط نسبي لعرض الشيك نفسه، فيتمدد النص وينكمش بنفس النسبة
+           * فيصحّ عدد الأسطر في الحالتين. بوحدة px ينكمش النص على الشاشة
+           * الصغيرة فيناسب سطراً أكثر مما يناسب في الطباعة.
+           *
+           * 11pt ÷ 210mm ≈ 1.848% من عرض الشيك.
+           */
+          /*
+           * الأحجام من نفس وحدة الطباعة (src/utils/printCheck.ts): قيمة
+           * واحدة تكفي المعاينة والمطبوع فلا يختلف أحدهما عن الآخر.
+           */
+          fontSize: `${isWrapping ? AMOUNT_WORDS_FONT_CQW : FIELD_FONT_CQW}cqw`,
+          ...(isWrapping
+            ? {
+                // عرض صريح إجباري: بدونه ينكمش العنصر على محتواه ولا يلتف أبداً
+                width: `${clampWidthPercent(position.widthPercent)}%`,
+                maxWidth: `${clampWidthPercent(position.widthPercent)}%`,
+                whiteSpace: 'normal',
+                overflowWrap: 'break-word',
+                lineHeight: 1.15,
+              }
+            : { whiteSpace: 'nowrap' }),
         }}
-        onMouseDown={(e) => handleMouseDown(e, elementType)}
+        onMouseDown={(event) => handleMouseDown(event, field)}
         title={isLocked ? currentLabels.lockedTitle : currentLabels.dragTitle}
       >
         {!isLocked && (
           <Move
-            className={`w-3 h-3 text-${colorClass}-600 dark:text-${colorClass}-400 absolute -top-1 -right-1 opacity-60 hover:opacity-100 transition-opacity no-print`}
+            className={`w-3 h-3 ${theme.badge} absolute -top-1 -right-1 opacity-60 transition-opacity no-print`}
           />
         )}
         {value}
@@ -449,44 +372,103 @@ const CheckPreview: React.FC<{
     );
   };
 
+  const positionFor = (field: FieldId): Position => positions[field] ?? { x: 0, y: 0 };
+
+  const amountWordsWidth = clampWidthPercent(positions.amountWords?.widthPercent);
+
+  const setAmountWordsWidth = (percent: number) => {
+    setPositions((current) => ({
+      ...current,
+      amountWords: {
+        ...current.amountWords,
+        widthPercent: clampWidthPercent(percent),
+      },
+    }));
+  };
+
+  /*
+   * الطباعة في نافذة مستقلة (src/utils/printCheck.ts): صفحة الشيك
+   * وحدها، بمقاسها الحقيقي 210×99mm وبنفس مواضع المعاينة.
+   *
+   * `window.open` تُستدعى فوراً من معالج النقر: النافذة المنبثقة تحتاج
+   * فعل المستخدم، وأي انتظار قبلها يجعل المتصفح يحجبها. أما
+   * `window.print()` من الصفحة نفسها فتبقى مساراً احتياطياً (@media
+   * print في index.css) لمن يطبع من المتصفح مباشرة بـ Ctrl+P.
+   */
+  const handlePrint = () => {
+    /*
+     * نفس الحقول ونفس قواعد الالتفاف والمحاذاة التي ترسمها المعاينة،
+     * حتى لا يختلف المطبوع عن المعروض.
+     */
+    const fields: PrintedField[] = [
+      { value: dateText, position: positionFor(FIELD.date), rightAligned: false, wrapping: false },
+      { value: checkData.place, position: positionFor(FIELD.place), rightAligned: false, wrapping: false },
+      {
+        value: checkData.beneficiary,
+        position: positionFor(FIELD.beneficiary),
+        rightAligned: true,
+        wrapping: false,
+      },
+      { value: amountNumeric, position: positionFor(FIELD.amount), rightAligned: false, wrapping: false },
+      {
+        value: amountInWords,
+        position: positionFor(FIELD.amountWords),
+        rightAligned: true,
+        wrapping: true,
+      },
+    ];
+
+    const result = printCheck({
+      title: currentLabels.printTitle,
+      language,
+      imageUrl: printTextOnly ? null : bank.imageUrl,
+      fields,
+      layout: printLayout,
+    });
+
+    /* المتصفح حظر النافذة: لا يطبع شيء، ونخبر المستخدم بدل الصمت */
+    if (!result.ok) {
+      window.alert(currentLabels.popupBlocked);
+      return;
+    }
+
+    onPrint?.();
+  };
+
   return (
     <div className="bg-white/90 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover-lift transition-shadow hover:shadow-xl">
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-5 py-4 no-print">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="bg-white/20 p-1.5 rounded-lg">
               <Eye className="w-5 h-5 text-white" />
             </div>
-            <h2 className="text-lg font-bold text-white">
-              {currentLabels.preview}
-            </h2>
+            <h2 className="text-lg font-bold text-white">{currentLabels.preview}</h2>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => setIsLocked(!isLocked)}
+              type="button"
+              onClick={onToggleLock}
+              aria-pressed={isLocked}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all duration-300 font-medium text-sm backdrop-blur-sm border border-white/20 hover:scale-105 ${
                 isLocked
-                  ? "bg-red-500/90 text-white hover:bg-red-600"
-                  : "bg-amber-500 text-white hover:bg-amber-600"
+                  ? 'bg-red-500/90 text-white hover:bg-red-600'
+                  : 'bg-amber-500 text-white hover:bg-amber-600'
               }`}
             >
-              {isLocked ? (
-                <Lock className="w-4 h-4" />
-              ) : (
-                <Unlock className="w-4 h-4" />
-              )}
-              <span>
-                {isLocked ? currentLabels.locked : currentLabels.unlocked}
-              </span>
+              {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+              <span>{isLocked ? currentLabels.locked : currentLabels.unlocked}</span>
             </button>
             <button
-              onClick={resetPositions}
+              type="button"
+              onClick={onResetPositions}
               className="flex items-center gap-1.5 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all duration-300 font-medium text-sm backdrop-blur-sm border border-white/20 hover:scale-105"
             >
-              <Move className="w-4 h-4" />
+              <RotateCcw className="w-4 h-4" />
               <span>{currentLabels.reset}</span>
             </button>
             <button
+              type="button"
               onClick={handlePrint}
               className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-all duration-300 font-medium text-sm backdrop-blur-sm border border-white/20 hover:scale-105"
             >
@@ -498,106 +480,202 @@ const CheckPreview: React.FC<{
       </div>
 
       <div className="p-5">
-        {/* منطقة المعاينة والطباعة */}
         <div
           ref={checkRef}
           id="check-preview"
-          className="relative w-full max-w-4xl mx-auto bg-center bg-no-repeat bg-contain rounded-xl overflow-hidden shadow-md border border-gray-300 dark:border-gray-600 screen-only"
+          className={`relative mx-auto rounded-xl overflow-hidden shadow-md border border-gray-300 dark:border-gray-600${
+            printTextOnly ? ' print-hide-image' : ''
+          }`}
           style={{
-            backgroundImage: `url('${bank.checkImageUrl}')`,
-            paddingBottom: "45%",
-            minHeight: "320px",
-            cursor: isDragging ? "grabbing" : "default",
+            /*
+             * العرض معياري: 210mm وهو نفس بُعد ورقة الشيك في الطباعة.
+             *
+             * كان العرض سائلاً (w-full)، فكان يختلف بين شاشة ومعاينة
+             * وطباعة: نسبة العرض نفسها تحوي عدداً مختلفاً من الحروف،
+             * فيخرج عدد الأسطر مختلفاً بين المعاينة والطباعة.
+             *
+             * `containerType: inline-size` يجعل وحدة cqw تساوي 1% من
+             * عرض الشيك، فتُحسب أحجام الخطوط بالنسبة نفسها فيظهر
+             * الالتفاف متطابقاً على أي مقاس شاشة. وبما أن الطباعة
+             * تستخدم نفس العرض (210mm) فهي نفس النسبة تماماً.
+             */
+            width: 'min(100%, 210mm)',
+            aspectRatio: '210 / 99',
+            containerType: 'inline-size',
+            cursor: draggedElement ? 'grabbing' : 'default',
           }}
         >
-          {/* التاريخ */}
-          {renderDraggableElement(
-            "date",
-            formatDate(checkData.date),
-            "blue",
-            positions.date || { x: 0, y: 0 }
+          {/*
+           * الصورة عنصر <img> لا خلفية CSS.
+           *
+           * المتصفحات لا تطبع خلفيات CSS إلا بخيار "طباعة الرسومات
+           * الخلفية" في حوار الطباعة، وهو خيار معطّل افتراضياً عند
+           * كثير من المستخدمين. خلفية CSS تعني شيكاً أبيض عليه الحقول
+           * فقط — أي ورقة بلا قيمة. عنصر الصورة يُطبع دائماً.
+           */}
+          {bank.imageUrl !== null && (
+            <img
+              src={bank.imageUrl}
+              alt=""
+              draggable={false}
+              className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
+            />
           )}
 
-          {/* المكان */}
-          {renderDraggableElement(
-            "place",
-            checkData.place,
-            "green",
-            positions.place || { x: 0, y: 0 }
+          {renderDraggableElement(FIELD.date, dateText, positionFor(FIELD.date))}
+          {renderDraggableElement(FIELD.place, checkData.place, positionFor(FIELD.place))}
+          {renderDraggableElement(FIELD.beneficiary, checkData.beneficiary, positionFor(FIELD.beneficiary))}
+          {renderDraggableElement(FIELD.amount, amountNumeric, positionFor(FIELD.amount))}
+          {renderDraggableElement(FIELD.amountWords, amountInWords, positionFor(FIELD.amountWords))}
+
+          {/* بنك بلا صورة: نص صريح بدل مساحة بيضاء لا يُعرف سببها */}
+          {bank.imageUrl === null && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span className="bg-white/85 dark:bg-gray-900/70 text-gray-500 dark:text-gray-400 text-xs px-3 py-1.5 rounded-lg">
+                {currentLabels.noImage}
+              </span>
+            </div>
           )}
 
-          {/* المستفيد */}
-          {renderDraggableElement(
-            "beneficiary",
-            checkData.beneficiary,
-            "purple",
-            positions.beneficiary || { x: 0, y: 0 },
-            true
-          )}
-
-          {/* المبلغ بالأرقام */}
-          {renderDraggableElement(
-            "amount",
-            checkData.amount
-              ? `${formatCurrency(Number(checkData.amount))} ${
-                  currentLabels.currency
-                }`
-              : "",
-            "yellow",
-            positions.amount || { x: 0, y: 0 }
-          )}
-
-          {/* المبلغ بالحروف */}
-          {renderDraggableElement(
-            "amountWords",
-            checkData.amount
-              ? `${getAmountInWords()} ${currentLabels.currencyWords}`
-              : "",
-            "orange",
-            positions.amountWords || { x: 0, y: 0 },
-            true
-          )}
-
-          {/* مؤشر السحب */}
-          {isDragging && draggedElement && (
+          {draggedElement && (
             <div className="absolute top-4 left-4 bg-black/80 text-white px-3 py-2 rounded-lg text-sm font-medium z-50 no-print">
-              {currentLabels.dragIndicator} ({draggedElement})
+              {currentLabels.dragIndicator}
             </div>
           )}
         </div>
 
-        {/* تعليمات السحب والإفلات */}
+        {/* التحكم في عرض المبلغ بالحروف — يغيّر الالتفاف مباشرة */}
+        <div className="mt-4 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 p-4 rounded-xl border border-orange-100 dark:border-orange-800 no-print">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <label
+              htmlFor="amount-words-width"
+              className="flex items-center gap-2 text-sm font-bold text-orange-800 dark:text-orange-200"
+            >
+              <Sparkles className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+              {currentLabels.widthControl}
+            </label>
+            <output
+              htmlFor="amount-words-width"
+              className="text-sm font-bold text-orange-700 dark:text-orange-300 tabular-nums"
+            >
+              {amountWordsWidth}%
+            </output>
+          </div>
+
+          <input
+            id="amount-words-width"
+            type="range"
+            min={MIN_WIDTH_PERCENT}
+            max={MAX_WIDTH_PERCENT}
+            step={1}
+            value={amountWordsWidth}
+            onChange={(event) => setAmountWordsWidth(Number(event.target.value))}
+            className="w-full accent-orange-500 cursor-pointer"
+            aria-describedby="amount-words-width-hint"
+          />
+
+          <p
+            id="amount-words-width-hint"
+            className="mt-2 text-xs text-orange-700 dark:text-orange-300"
+          >
+            {currentLabels.widthHint}
+          </p>
+        </div>
+
+        {/* القوالب المحفوظة */}
+        <div className="mt-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800 no-print">
+          <h3 className="flex items-center gap-2 text-sm font-bold text-indigo-800 dark:text-indigo-200 mb-3">
+            <Bookmark className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            {currentLabels.presets}
+          </h3>
+
+          {presets.length === 0 ? (
+            <p className="text-xs text-indigo-700 dark:text-indigo-300">
+              {currentLabels.noPresets}
+            </p>
+          ) : (
+            <ul className="flex flex-wrap gap-2">
+              {presets.map((preset) => (
+                <li
+                  key={preset.id}
+                  className={`flex items-center rounded-lg overflow-hidden ${
+                    renamingId === preset.id ? 'ring-2 ring-indigo-400' : ''
+                  }`}
+                >
+                  {renamingId === preset.id ? (
+                    <>
+                      <input
+                        id={`preset-rename-${preset.id}`}
+                        defaultValue={preset.name}
+                        autoFocus
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') event.currentTarget.blur();
+                          if (event.key === 'Escape') setRenamingId(null);
+                        }}
+                        onBlur={(event) => {
+                          const done = onRenamePreset(preset, event.target.value);
+                          setRenamingId(null);
+                          void done;
+                        }}
+                        className="px-2 py-1.5 w-40 text-xs bg-white dark:bg-gray-700 border border-indigo-300 dark:border-indigo-600 focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setRenamingId(null)}
+                        aria-label={currentLabels.cancel}
+                        className="px-2 py-1.5 bg-gray-500 text-white text-xs hover:bg-gray-600"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onApplyPreset(preset)}
+                        className="px-3 py-1.5 rounded-r-none rounded-l-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 transition-colors max-w-[14rem] truncate"
+                        title={preset.name}
+                      >
+                        {preset.name}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRenamingId(preset.id)}
+                        aria-label={`${currentLabels.renamePreset}: ${preset.name}`}
+                        className="px-2 py-1.5 bg-indigo-500 text-white text-xs hover:bg-indigo-600 transition-colors border-l border-indigo-400"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDeletePreset(preset.id)}
+                        aria-label={`${currentLabels.deletePreset}: ${preset.name}`}
+                        className="px-2 py-1.5 rounded-l-none rounded-r-lg bg-red-500 text-white text-xs hover:bg-red-600 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* تعليمات السحب */}
         <div className="mt-4 bg-gradient-to-r from-blue-50 to-amber-50 dark:from-blue-900/20 dark:to-amber-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800 no-print">
           <div className="flex items-center gap-2 mb-3">
             <Move className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             <h3 className="text-sm font-bold text-blue-800 dark:text-blue-200">
-              {currentLabels.positionTips}
+              {currentLabels.editMode}
             </h3>
           </div>
-          <div className="grid sm:grid-cols-2 gap-3 text-sm">
-            <div className="space-y-1">
-              <p className="text-blue-700 dark:text-blue-300 font-medium">
-                🔓 <strong>{currentLabels.editMode}:</strong>{" "}
-                {currentLabels.drag}
-              </p>
-              <p className="text-blue-700 dark:text-blue-300 font-medium">
-                🖱️ <strong>{currentLabels.drag}:</strong> {currentLabels.drag}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-green-700 dark:text-green-300 font-medium">
-                🔒 <strong>{currentLabels.lockMode}:</strong>{" "}
-                {currentLabels.lockMode}
-              </p>
-              <p className="text-green-700 dark:text-green-300 font-medium">
-                ↩️ <strong>{currentLabels.resetPos}:</strong>{" "}
-                {currentLabels.resetPos}
-              </p>
-            </div>
-          </div>
+          <p className="text-sm text-green-700 dark:text-green-300 font-medium">
+            {currentLabels.lockMode}
+          </p>
         </div>
 
-        {/* معلومات المعاينة */}
+        {/* المبلغ بالحروف */}
         <div className="mt-5 no-print">
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 p-4 rounded-xl border border-green-200 dark:border-green-800">
             <h3 className="font-bold text-green-800 dark:text-green-200 mb-3 text-sm flex items-center gap-2">
@@ -608,20 +686,18 @@ const CheckPreview: React.FC<{
             </h3>
             <div className="bg-white/80 dark:bg-gray-700/80 p-3 rounded-lg">
               <p
-                className="text-green-700 dark:text-green-300 font-medium text-sm leading-relaxed"
-                dir="ltr"
+                className="text-green-700 dark:text-green-300 font-medium text-sm leading-relaxed break-words"
+                dir="auto"
               >
-                {checkData.amount
-                  ? `${getAmountInWords()} ${currentLabels.currencyWords}`
-                  : language === "ar"
-                  ? "أدخل المبلغ لرؤية التحويل التلقائي"
-                  : "Entrez le montant pour voir la conversion automatique"}
+                {amountIsUnsupported
+                  ? currentLabels.unsupportedAmount
+                  : amountInWords || currentLabels.emptyAmount}
               </p>
             </div>
-            {checkData.amount && (
+            {amountInWords && !amountIsUnsupported && (
               <div className="mt-3 p-2.5 bg-green-100 dark:bg-green-900/30 rounded-lg">
                 <p className="text-green-800 dark:text-green-200 text-sm font-medium">
-                  ✨ {currentLabels.autoConvert}
+                  {currentLabels.autoConvert}
                 </p>
               </div>
             )}
@@ -640,7 +716,27 @@ const CheckPreview: React.FC<{
             <p>• {currentLabels.printTip1}</p>
             <p>• {currentLabels.printTip2}</p>
             <p>• {currentLabels.printTip3}</p>
+            <p>• {currentLabels.printTip4}</p>
           </div>
+
+          {/*
+           * الكتابة فقط: الاستعمال المعتاد شيك فارغ في الطابعة، فنطبع
+           * الحقول دون صورة البنك. تفضيل جهاز لا بيانات شيك، فحفظناه
+           * محلياً مع بقية تفضيلات العرض.
+           */}
+          <label className="mt-3 flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-200 cursor-pointer">
+            <input
+              id="print-text-only"
+              type="checkbox"
+              checked={printTextOnly}
+              onChange={(event) => {
+                setPrintTextOnly(event.target.checked);
+                savePreference(PRINT_TEXT_ONLY_KEY, event.target.checked ? '1' : '0');
+              }}
+              className="w-4 h-4 accent-amber-600"
+            />
+            {currentLabels.printTextOnly}
+          </label>
         </div>
       </div>
     </div>
