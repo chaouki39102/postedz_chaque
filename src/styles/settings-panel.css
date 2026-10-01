@@ -475,6 +475,53 @@ html.dark .sp-shell {
   display: inline-block;
 }
 
+/* ---- تبويب الخطوط ---- */
+
+.sp-fonts__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.92fr);
+  gap: 22px;
+  align-items: start;
+}
+
+/* حجم مضبوط يتلوّن بالنحاس: القيمة الافتراضية باهتة وما خالفها نحاسي */
+.sp-field__value--set {
+  color: var(--sp-accent);
+}
+
+/*
+ * نموذج الشيك: ورق أبيض ونص أسود حتى في الوضع الداكن، لأن ما يراه
+ * المستخدم هنا يجب أن يكون لون الورقة لا لون الواجهة.
+ */
+.sp-specimen {
+  border: 1px solid var(--sp-line-strong);
+  border-radius: var(--sp-radius);
+  padding: 12px;
+  background: color-mix(in srgb, var(--sp-ink) 4%, transparent);
+}
+
+.sp-specimen__paper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 210 / 99;
+  container-type: inline-size;
+  background: #ffffff;
+  border: 1px solid color-mix(in srgb, #000000 22%, transparent);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sp-specimen__field {
+  position: absolute;
+  color: #000000;
+  font-family: 'Cairo', sans-serif;
+  font-weight: 700;
+}
+
+.sp-specimen__caption {
+  margin: 12px 0 0;
+}
+
 /* ---- تضييق الشاشة: الشريط يصير أفقياً والتبويبات تبقى ---- */
 
 @media (max-width: 860px) {
@@ -490,7 +537,14 @@ html.dark .sp-shell {
     border-bottom: 1px solid var(--sp-line);
   }
 
+  /*
+   * الشريط الأفقي يتمرّر أفقياً بطبيعته: نُبقي كل تبويب بعرض
+   * محتواه. العمود المرن minmax(0, 1fr) يقصّ النص عند ضيق النافذة
+   * ويحوّل شريطاً قابلاً للتمرير إلى قائمة مقطوعة بلا معنى.
+   */
   .sp-rail__item {
+    flex: 0 0 auto;
+    grid-template-columns: 22px 18px auto;
     border-inline-start: 0;
     border-bottom: 2px solid transparent;
     border-radius: var(--sp-radius) var(--sp-radius) 0 0;
@@ -503,6 +557,10 @@ html.dark .sp-shell {
   }
 
   .sp-print__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sp-fonts__grid {
     grid-template-columns: minmax(0, 1fr);
   }
 

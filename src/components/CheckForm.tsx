@@ -3,6 +3,7 @@ import { Calendar, MapPin, User, DollarSign, Settings, Sparkles, Bookmark, Save 
 import type { CheckData, PositionMap, Language, Preset } from '../types';
 import { MAX_AMOUNT } from '../constants';
 import { useLabelProxy, useLabels } from '../context/labelsCore';
+import { patchPosition } from '../utils/positions';
 
 /** حدود عرض نص المبلغ بالحروف (نسبة مئوية من عرض الشيك) */
 const MIN_WIDTH_PERCENT = 10;
@@ -104,10 +105,8 @@ const CheckForm: React.FC<CheckFormProps> = ({
 
   const handlePositionChange = useCallback(
     (field: string, axis: 'x' | 'y', value: number) => {
-      setPositions((current) => ({
-        ...current,
-        [field]: { ...current[field], [axis]: value },
-      }));
+      // patchPosition لا التوزيع المباشر: الحقل قد يكون غائباً من الخريطة
+      setPositions((current) => patchPosition(current, field, { [axis]: value }));
     },
     [setPositions]
   );
@@ -313,13 +312,11 @@ const CheckForm: React.FC<CheckFormProps> = ({
                 step={1}
                 value={clampWidthPercent(positions.amountWords?.widthPercent)}
                 onChange={(e) =>
-                  setPositions((current) => ({
-                    ...current,
-                    amountWords: {
-                      ...current.amountWords,
+                  setPositions((current) =>
+                    patchPosition(current, 'amountWords', {
                       widthPercent: clampWidthPercent(parseNumericInput(e.target.value)),
-                    },
-                  }))
+                    })
+                  )
                 }
                 className="w-full px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm border-2 border-orange-200 dark:border-orange-700 rounded-lg focus:border-orange-500 dark:focus:border-orange-400 transition-all duration-200 mobile-input dark:bg-gray-700 dark:text-white"
                 placeholder={language === 'ar' ? 'مثال: 50' : 'Ex: 50'}

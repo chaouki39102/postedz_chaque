@@ -28,18 +28,30 @@ export const getDefaultPositions = (): PositionMap =>
  * يدمج المواضع المحفوظة فوق الافتراضية.
  *
  * الدمج ضروري لأن الحقول تختلف بين النماذج: لو حفظنا مواضعاً ناقصة
- * (الحقل ما زال بمكانه الافتراضي) فالحقل الناقص يختفي من المعاينة.
+ * (الحقل ما زال بمكانه الافتراضي) فالحقل الناقص يختفي من المعاينة،
+ * ومن يعدّل غائباً يبني موضعاً بلا إحداثيات فيرفض الحفظ.
+ *
+ * `defaults` اختياري: هو نفس مصدر الافتراضي الذي يمرّره التطبيق،
+ * فلا تُحسب القيم الافتراضية من مسارين مختلفين.
  */
-export const mergeWithDefaults = (saved: PositionMap | null): PositionMap => {
-  if (!saved) return getDefaultPositions();
+export const mergeWithDefaults = (saved: PositionMap | null, defaults?: PositionMap | null): PositionMap => {
+  if (!saved) return defaults ? clonePositions(defaults) : getDefaultPositions();
 
-  const merged: PositionMap = getDefaultPositions();
+  const base = defaults ? clonePositions(defaults) : getDefaultPositions();
+  const merged: PositionMap = base;
   for (const [field, position] of Object.entries(saved)) {
     if (!position) continue;
-    merged[field] = { ...merged[field], ...position };
+    // الحقول الناقصة في القاعدة تبقى على قيم الافتراضية لا تُحذف
+    merged[field] = { ...base[field], ...position };
   }
   return merged;
 };
+
+/** نسخة جديدة من أي خريطة مواضع (الكائن نفسه لا يُعاد استخدامه) */
+const clonePositions = (source: PositionMap): PositionMap =>
+  Object.fromEntries(
+    Object.entries(source).map(([field, position]) => [field, { ...position }])
+  ) as PositionMap;
 
 /** ترتيب الحقول في لوحة التحكم */
 export const POSITION_FIELD_ORDER = [

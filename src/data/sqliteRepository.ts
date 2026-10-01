@@ -255,8 +255,8 @@ export class SqliteRepository implements CheckRepository {
 
           db.run(
             `INSERT OR REPLACE INTO bank_positions
-               (bank_id, language, field, x, y, width_percent)
-             VALUES (?, ?, ?, ?, ?, ?)`,
+               (bank_id, language, field, x, y, width_percent, font_cqw)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [
               entry.bankId,
               entry.language,
@@ -264,6 +264,7 @@ export class SqliteRepository implements CheckRepository {
               position.x,
               position.y,
               position.widthPercent ?? null,
+              position.fontCqw ?? null,
             ]
           );
           report.positions += 1;
@@ -556,7 +557,7 @@ export class SqliteRepository implements CheckRepository {
   async loadPositions(bankId: string, language: Language): Promise<PositionMap | null> {
     const rows = queryAll(
       this.db,
-      'SELECT field, x, y, width_percent FROM bank_positions WHERE bank_id = ? AND language = ?',
+      'SELECT field, x, y, width_percent, font_cqw FROM bank_positions WHERE bank_id = ? AND language = ?',
       [bankId, language]
     );
 
@@ -570,6 +571,10 @@ export class SqliteRepository implements CheckRepository {
       const position: PositionMap[string] = { x: Number(row.x), y: Number(row.y) };
       if (row.width_percent !== null && row.width_percent !== undefined) {
         position.widthPercent = Number(row.width_percent);
+      }
+      // NULL = الحجم الافتراضي، فنترك الحقل غائباً بدل تخزين صفر
+      if (row.font_cqw !== null && row.font_cqw !== undefined) {
+        position.fontCqw = Number(row.font_cqw);
       }
       result[field] = position;
     }
@@ -586,20 +591,31 @@ export class SqliteRepository implements CheckRepository {
       db.run('DELETE FROM bank_positions WHERE bank_id = ? AND language = ?', [bankId, language]);
 
       const stmt = db.prepare(
-        `INSERT INTO bank_positions (bank_id, language, field, x, y, width_percent)
-         VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO bank_positions (bank_id, language, field, x, y, width_percent, font_cqw)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
       );
       try {
         for (const field of CHECK_FIELDS) {
           const position = positions[field];
           if (!position) continue;
+
+          /*
+           * الإحداثيان أساسان في الصف: لو غابا رفض sql.js الربط
+           * (undefined) فيرفض المعاملة كاملة. الصف التالف يُتخطى بدل
+           * أن يُسقط حفظ بقية الحقول.
+           */
+          const x = Number(position.x);
+          const y = Number(position.y);
+          if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+
           stmt.run([
             bankId,
             language,
             field,
-            position.x,
-            position.y,
+            x,
+            y,
             position.widthPercent ?? null,
+            position.fontCqw ?? null,
           ]);
         }
       } finally {

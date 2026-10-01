@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Database, Landmark, Languages, Save, FolderOpen, Printer } from 'lucide-react';
+import { X, Database, Landmark, Languages, Save, FolderOpen, Printer, Type } from 'lucide-react';
 import { useLabelProxy } from '../../context/labelsCore';
 import type { PrintLayoutApi } from '../../hooks/usePrintLayout';
 import BanksTab from './BanksTab';
@@ -7,10 +7,11 @@ import DefaultsTab from './DefaultsTab';
 import PresetsTab from './PresetsTab';
 import LabelsTab from './LabelsTab';
 import DataTab from './DataTab';
+import FontsTab from './FontsTab';
 import PrintTab from './PrintTab';
 import type { PositionMap } from '../../types';
 
-export type ManageTab = 'banks' | 'defaults' | 'presets' | 'labels' | 'print' | 'data';
+export type ManageTab = 'banks' | 'defaults' | 'presets' | 'labels' | 'fonts' | 'print' | 'data';
 
 interface ManagementPanelProps {
   isOpen: boolean;
@@ -44,6 +45,7 @@ const TABS: Array<{ id: ManageTab; icon: React.ReactNode }> = [
   { id: 'defaults', icon: <Save className="w-4 h-4" aria-hidden="true" /> },
   { id: 'presets', icon: <FolderOpen className="w-4 h-4" aria-hidden="true" /> },
   { id: 'labels', icon: <Languages className="w-4 h-4" aria-hidden="true" /> },
+  { id: 'fonts', icon: <Type className="w-4 h-4" aria-hidden="true" /> },
   { id: 'print', icon: <Printer className="w-4 h-4" aria-hidden="true" /> },
   { id: 'data', icon: <Database className="w-4 h-4" aria-hidden="true" /> },
 ];
@@ -142,6 +144,9 @@ const ManagementPanel: React.FC<ManagementPanelProps> = ({
               <PresetsTab activeBankId={activeBankId} onChanged={onPresetsChanged} />
             )}
             {tab === 'labels' && <LabelsTab />}
+            {tab === 'fonts' && (
+              <FontsTab positions={positions} setPositions={setPositions} />
+            )}
             {tab === 'print' && (
               <PrintTab printLayout={printLayout} positions={positions} setPositions={setPositions} />
             )}

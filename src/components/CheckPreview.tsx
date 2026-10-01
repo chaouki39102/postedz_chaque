@@ -5,10 +5,14 @@ import { formatDateNumeric } from '../utils/date';
 import { CHECK_FIELDS } from '../types';
 import { useLabelProxy } from '../context/labelsCore';
 import { loadPreference, savePreference } from '../utils/storage';
+import { patchPosition } from '../utils/positions';
 import {
   printCheck,
-  FIELD_FONT_CQW,
-  AMOUNT_WORDS_FONT_CQW,
+  clampFontCqw,
+  clampWidthPercent,
+  MIN_WIDTH_PERCENT,
+  MAX_WIDTH_PERCENT,
+  FIELD_LAYOUT,
   type PrintedField,
   type PrintLayout,
 } from '../utils/printCheck';
@@ -26,35 +30,18 @@ const FIELD = {
   amountWords: 'amountWords',
 } as const satisfies Record<FieldId, FieldId>;
 
-/** العناصر المحاذاة لليمين بدل اليسار */
-const RIGHT_ALIGNED: ReadonlySet<FieldId> = new Set<FieldId>([FIELD.beneficiary, FIELD.amountWords]);
+/** العناصر المحاذاة لليمين بدل اليسار: مصدر واحد مع مستند الطباعة */
+const isRightAligned = (field: FieldId): boolean => FIELD_LAYOUT[field].rightAligned;
 
 /** حدود حركة السحب (نسبة مئوية) */
 const MIN_OFFSET = -100;
 const MAX_OFFSET = 200;
-
-/** حدود عرض نص المبلغ بالحروف (نسبة مئوية من عرض الشيك) */
-const MIN_WIDTH_PERCENT = 10;
-const MAX_WIDTH_PERCENT = 95;
-const DEFAULT_WIDTH_PERCENT = 50;
 
 /** عرض ورقة الشيك الحقيقي 210mm بالبكسل عند 96dpi (نسبة CSS) */
 const PRINT_WIDTH_PX = (210 * 96) / 25.4;
 
 /** تفضيل: طباعة الحقول فقط دون صورة البنك (الشيك في الطابعة فارغ) */
 const PRINT_TEXT_ONLY_KEY = 'print_text_only';
-
-/**
- * يحدّ عرض المبلغ بالحروف إلى نطاق صالح.
- *
- * العرض نسبة مئوية من عرض الشيك وليس بكسل، لأن العرض بالبكسل كان يجعل
- * الالتفاف مختلفاً بين المعاينة (≈900px) والطباعة (210mm ≈ 794px)،
- * فيخرج النص المطبوع غير مطابق للمعاينة.
- */
-const clampWidthPercent = (value: number | undefined): number => {
-  if (value === undefined || !Number.isFinite(value)) return DEFAULT_WIDTH_PERCENT;
-  return Math.min(MAX_WIDTH_PERCENT, Math.max(MIN_WIDTH_PERCENT, value));
-};
 
 /**
  * ألوان العناصر قابلة للتحليل (scannable) بواسطة Tailwind.
@@ -239,8 +226,8 @@ const CheckPreview: React.FC<CheckPreviewProps> = ({
         let deltaX = ((event.clientX - drag.startX) / rect.width) * 100;
         const deltaY = ((event.clientY - drag.startY) / rect.height) * 100;
 
-        // العناصر المحاذاة لليمين تتحرك عكسياً
-        if (RIGHT_ALIGNED.has(drag.field)) deltaX = -deltaX;
+      // العناصر المحاذاة لليمين تتحرك عكسياً
+      if (isRightAligned(drag.field)) deltaX = -deltaX;
 
         commitDragPosition(
           drag.field,
@@ -306,9 +293,9 @@ const CheckPreview: React.FC<CheckPreviewProps> = ({
     if (!value) return null;
 
     const theme = FIELD_THEME[field];
-    const isRightAligned = RIGHT_ALIGNED.has(field);
+    const isRightAlignedField = isRightAligned(field);
     const isActive = draggedElement === field;
-    const isWrapping = field === FIELD.amountWords;
+    const isWrapping = FIELD_LAYOUT[field].wrapping;
 
     return (
       <div
@@ -330,9 +317,9 @@ const CheckPreview: React.FC<CheckPreviewProps> = ({
           isActive ? `${theme.active} shadow-lg z-50` : '',
         ].filter(Boolean).join(' ')}
         style={{
-          [isRightAligned ? 'right' : 'left']: `${position.x}%`,
+          [isRightAlignedField ? 'right' : 'left']: `${position.x}%`,
           top: `${position.y}%`,
-          transform: `translate(${isRightAligned ? '50%' : '-50%'}, -50%)`,
+          transform: `translate(${isRightAlignedField ? '50%' : '-50%'}, -50%)`,
           fontFamily: 'Cairo, sans-serif',
           /*
            * أحجام الخطوط بوحدة cqw (1% من عرض الشيك) لا بوحدة px.
@@ -346,8 +333,11 @@ const CheckPreview: React.FC<CheckPreviewProps> = ({
           /*
            * الأحجام من نفس وحدة الطباعة (src/utils/printCheck.ts): قيمة
            * واحدة تكفي المعاينة والمطبوع فلا يختلف أحدهما عن الآخر.
+           * و`fontCqw` من مواضع الحقل: ما يضبطه المستخدم في تبويب
+           * الخطوط يظهر هنا وفي المستند المطبوع بنفس القيمة، وغيابه
+           * يعود إلى الحجم الافتراضي لهذا الحقل.
            */
-          fontSize: `${isWrapping ? AMOUNT_WORDS_FONT_CQW : FIELD_FONT_CQW}cqw`,
+          fontSize: `${clampFontCqw(position.fontCqw, isWrapping)}cqw`,
           ...(isWrapping
             ? {
                 // عرض صريح إجباري: بدونه ينكمش العنصر على محتواه ولا يلتف أبداً
@@ -377,13 +367,9 @@ const CheckPreview: React.FC<CheckPreviewProps> = ({
   const amountWordsWidth = clampWidthPercent(positions.amountWords?.widthPercent);
 
   const setAmountWordsWidth = (percent: number) => {
-    setPositions((current) => ({
-      ...current,
-      amountWords: {
-        ...current.amountWords,
-        widthPercent: clampWidthPercent(percent),
-      },
-    }));
+    setPositions((current) =>
+      patchPosition(current, 'amountWords', { widthPercent: clampWidthPercent(percent) })
+    );
   };
 
   /*
@@ -400,23 +386,19 @@ const CheckPreview: React.FC<CheckPreviewProps> = ({
      * نفس الحقول ونفس قواعد الالتفاف والمحاذاة التي ترسمها المعاينة،
      * حتى لا يختلف المطبوع عن المعروض.
      */
-    const fields: PrintedField[] = [
-      { value: dateText, position: positionFor(FIELD.date), rightAligned: false, wrapping: false },
-      { value: checkData.place, position: positionFor(FIELD.place), rightAligned: false, wrapping: false },
-      {
-        value: checkData.beneficiary,
-        position: positionFor(FIELD.beneficiary),
-        rightAligned: true,
-        wrapping: false,
-      },
-      { value: amountNumeric, position: positionFor(FIELD.amount), rightAligned: false, wrapping: false },
-      {
-        value: amountInWords,
-        position: positionFor(FIELD.amountWords),
-        rightAligned: true,
-        wrapping: true,
-      },
-    ];
+    const fields: PrintedField[] = (
+      [
+        [FIELD.date, dateText],
+        [FIELD.place, checkData.place],
+        [FIELD.beneficiary, checkData.beneficiary],
+        [FIELD.amount, amountNumeric],
+        [FIELD.amountWords, amountInWords],
+      ] as const
+    ).map(([field, value]) => ({
+      value,
+      position: positionFor(field),
+      ...FIELD_LAYOUT[field],
+    }));
 
     const result = printCheck({
       title: currentLabels.printTitle,

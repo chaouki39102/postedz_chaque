@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getRepository } from '../data';
 import { DEFAULT_UI_PREFS } from '../data/repository';
+import { mergeWithDefaults } from '../banksData';
 import { toLocalDateInputValue } from '../utils/date';
 import type { CheckData, Language, PositionMap, Preset, StoredCheckData, UiPrefs } from '../types';
 
@@ -124,7 +125,16 @@ export const useCheckState = ({
       // التاريخ الآلي يعني: القيمة قادمة من القاعدة، لا من المستخدم
       dateIsAutoRef.current = loadedData ? loadedData.dateIsAuto : defaults.dateIsAuto;
       setPrefsState(loadedPrefs);
-      setPositionsState(loadedPositions ?? { ...defaultPositionsRef.current });
+      /*
+       * المواضع تُدمج مع الافتراضية دائماً، لا عند غيابها فقط.
+       *
+       * القاعدة قد تحوي صفاً لحقل واحد فقط (المستخدم حرّك التاريخ
+       * وحده)، فالمصفوفة المحمَّلة ناقصة. تمريرها كما هي يعني أن كل
+       * من يضبط حقلاً غائباً يبني `{...current[field], fontCqw}` فتصير
+       * `{fontCqw}` بلا x ولا y، ويرفض sql.js ربط undefined فيرفض
+       * الحفظ كله. الدمج هنا يمنع ولود مثل هذه المصفوفة أصلاً.
+       */
+      setPositionsState(mergeWithDefaults(loadedPositions, defaultPositionsRef.current));
       setScope(scopeKey);
       setIsReady(true);
     };

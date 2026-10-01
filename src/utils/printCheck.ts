@@ -1,4 +1,4 @@
-import type { Language, Position } from '../types';
+import type { CheckField, Language, Position } from '../types';
 
 /**
  * طباعة الشيك في نافذة مستقلة.
@@ -101,6 +101,76 @@ export const clampLayout = (layout?: Partial<PrintLayout> | null): PrintLayout =
 export const FIELD_FONT_CQW = 1.9;
 export const AMOUNT_WORDS_FONT_CQW = 1.848;
 
+/** مدى الحجم المسموح لكل حقل (cqw) */
+export const MIN_FONT_CQW = 1;
+export const MAX_FONT_CWQ = 3.4;
+
+/**
+ * ملّيمتر إلى نقطة: النقطة وحدة الطباعة التي يعرفها المستخدم، ونقطة
+ * واحدة = 25.4/72 مم. التحويل معروف في اتجاهه (cqw ↔ pt) فلا تُحسب
+ * الأرقام في الواجهة ولا في المستند ولا يتفرقان.
+ */
+export const MM_PER_INCH = 25.4;
+export const PT_PER_INCH = 72;
+
+/** حجم الخط الافتراضي لحقل: المبلغ بالحروف أصغر قليلاً لأنه يكثر أسطره */
+export const defaultFontCqw = (wrapping: boolean): number =>
+  wrapping ? AMOUNT_WORDS_FONT_CQW : FIELD_FONT_CQW;
+
+/**
+ * يحدّ حجم الخط إلى مجال صالح ويعيد الافتراضي عند غيابه.
+ *
+ * نفس الدالة في المعاينة وفي مستند الطباعة: الرقم المحفوظ وما يُطبع
+ * فعلاً لا يفترقان، والقيمة التالفة (صفر، NaN، حجم ضخم) ترجع إلى
+ * الحجم الافتراضي بدل أن يختفي الحقل أو يملأ الشيك كله.
+ */
+export const clampFontCqw = (value: number | undefined, wrapping: boolean): number => {
+  const fallback = defaultFontCqw(wrapping);
+  if (value === undefined || !Number.isFinite(value)) return fallback;
+  return Math.min(MAX_FONT_CWQ, Math.max(MIN_FONT_CQW, value));
+};
+
+/** حجم الخط بالنقطة على ورق 210mm: 1cqw = 2.1مم ≈ 5.95pt */
+export const cqwToPt = (cqw: number): number =>
+  (cqw / 100) * CHECK_WIDTH_MM * (PT_PER_INCH / MM_PER_INCH);
+
+/** نفس التحويل بالعكس: نقطة ← cqw (لأن المستخدم يضبط بالنقاط) */
+export const ptToCqw = (pt: number): number =>
+  (pt * (MM_PER_INCH / PT_PER_INCH)) / CHECK_WIDTH_MM * 100;
+
+/** مدى عرض نص المبلغ بالحروف (نسبة مئوية من عرض الشيك) */
+export const MIN_WIDTH_PERCENT = 10;
+export const MAX_WIDTH_PERCENT = 95;
+export const DEFAULT_WIDTH_PERCENT = 50;
+
+/**
+ * يحدّ عرض المبلغ بالحروف إلى نطاق صالح.
+ *
+ * العرض نسبة مئوية من عرض الشيك وليس بكسل، لأن العرض بالبكسل كان يجعل
+ * الالتفاف مختلفاً بين المعاينة (≈900px) والطباعة (210mm ≈ 794px)،
+ * فيخرج النص المطبوع غير مطابق للمعاينة.
+ */
+export const clampWidthPercent = (value: number | undefined): number => {
+  if (value === undefined || !Number.isFinite(value)) return DEFAULT_WIDTH_PERCENT;
+  return Math.min(MAX_WIDTH_PERCENT, Math.max(MIN_WIDTH_PERCENT, value));
+};
+
+/**
+ * محاذاة كل حقل في الشيك: يمين أم يسار، ويلتفّ أم سطر واحد.
+ *
+ * معرّف واحد يستعمله رسم المعاينة ورسم مستند الطباعة ورسم نموذج الخطوط
+ * في الإعدادات. قبل ذلك كانت المحاذاة والالتفاف مُعلَّمين في أكثر من
+ * موضع، فيكفي أن يتغير أحدها ليخرج المطبوع عن المعاينة.
+ */
+export const FIELD_LAYOUT: Record<CheckField, { rightAligned: boolean; wrapping: boolean }> = {
+  date: { rightAligned: false, wrapping: false },
+  place: { rightAligned: false, wrapping: false },
+  beneficiary: { rightAligned: true, wrapping: false },
+  amount: { rightAligned: false, wrapping: false },
+  amountWords: { rightAligned: true, wrapping: true },
+};
+
+
 /**
  * مهلة انتظار جاهزية الخطوط والصور.
  *
@@ -195,7 +265,12 @@ const renderField = (field: PrintedField): string => {
 
   const side = field.rightAligned ? 'right' : 'left';
   const shift = field.rightAligned ? '50%' : '-50%';
-  const fontSize = field.wrapping ? AMOUNT_WORDS_FONT_CQW : FIELD_FONT_CQW;
+  /*
+   * حجم الحقل من مواضعه (fontCqw) لا من ثابت عام: الضبط الذي رآه
+   * المستخدم في المعاينة هو نفسه الذي يخرج على الورقة. الغياب أو
+   * القيمة التالفة ترجع إلى الحجم الافتراضي لهذا الحقل.
+   */
+  const fontSize = clampFontCqw(field.position.fontCqw, field.wrapping);
 
   /*
    * لا حشو في المطبوع: الحشو في المعاينة للتمييز البصري فقط، وهو

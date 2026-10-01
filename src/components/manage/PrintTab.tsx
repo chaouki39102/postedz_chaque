@@ -12,6 +12,7 @@ import {
   SHEET_WIDTH_MM,
 } from '../../utils/printCheck';
 import type { PositionMap } from '../../types';
+import { patchPosition } from '../../utils/positions';
 
 /** مقياس الرسم: أبعاد الورقة بالملّيمتر 그대로 داخل viewBox */
 const DIAGRAM_WIDTH = SHEET_WIDTH_MM;
@@ -89,10 +90,9 @@ const PrintTab: React.FC<PrintTabProps> = ({ printLayout, positions, setPosition
       if (draft.trim() === '' || !Number.isFinite(parsed)) return;
       const clamped = Math.min(MAX_AMOUNT_RIGHT_MM, Math.max(MIN_AMOUNT_RIGHT_MM, parsed));
 
-      setPositions((current) => ({
-        ...current,
-        amount: { ...current.amount, x: toPercent(clamped) },
-      }));
+      setPositions((current) =>
+        patchPosition(current, 'amount', { x: toPercent(clamped) })
+      );
     },
     [setPositions]
   );

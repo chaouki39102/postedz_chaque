@@ -14,7 +14,7 @@ import type { Database } from 'sql.js';
  */
 
 /** إصدار المخطط الحالي. يراه المحرك ويقارنه بما هو مطبَّق فعلاً. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export interface Migration {
   version: number;
@@ -198,6 +198,23 @@ export const MIGRATIONS: readonly Migration[] = [
           PRIMARY KEY (language, field)
         );
       `);
+    },
+  },
+  {
+    version: 3,
+    description: 'حجم خط كل حقل: عمود font_cqw في مواضع البنك',
+    up: (db) => {
+      /*
+       * العمود جديد على جدول منشور، فلا بد من ترحيل مستقل بدل تعديل
+       * إنشاء الجدول في النسخة 1: الأجهزة التي نفّذت تلك النسخة لن
+       * تعيد تشغيلها.
+       *
+       * القيم NULL لا صفر: صفر يعني «لا خط» والحقل يختفي، وNULL يعني
+       * «لم يضبطه المستخدم» فيعود إلى الحجم الافتراضي عند القراءة
+       * (انظر clampFontCqw). الحقول القائمة بلا صف جديد أصلاً، فتبقى
+       * على أحجامها الافتراضية بلا مساس.
+       */
+      db.run('ALTER TABLE bank_positions ADD COLUMN font_cqw REAL');
     },
   },
 ];

@@ -31,6 +31,9 @@ class Cdp {
     this.id = 0;
     this.pending = new Map();
     this.problems = [];
+    /** أسباب الرفض تُقرأ من الصفحة لحظة الاستثناء، لا في نهاية التشغيل */
+    this.rejectionReads = [];
+    this.sawPromiseRejection = false;
     ws.addEventListener('message', (event) => {
       const message = JSON.parse(event.data);
       if (message.id !== undefined) {
@@ -50,6 +53,19 @@ class Cdp {
       if (message.method === 'Runtime.exceptionThrown') {
         const details = message.params.exceptionDetails;
         this.problems.push('exception: ' + (details.exception?.description ?? details.text));
+        if (/in promise/.test(details.text ?? '')) {
+          this.sawPromiseRejection = true;
+          /*
+           * السبب يُقرأ فوراً: النافذة تُستبدل عند كل تنقّل، فقراءة
+           * window.__lastRejection في نهاية التشغيل تعطي "not captured"
+           * وتخفي السبب الوحيد المفيد.
+           */
+          this.rejectionReads.push(
+            this.send('Runtime.evaluate', { expression: 'window.__lastRejection ?? null' })
+              .then((result) => result?.result?.value ?? null)
+              .catch(() => null)
+          );
+        }
       }
       if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error') {
         this.problems.push(`log: ${message.params.entry.text} ${message.params.entry.url ?? ''}`);
@@ -245,6 +261,27 @@ const countLines = (text) => (text === '' ? 0 : text.trimEnd().split('\n').lengt
   await cdp.send('Runtime.enable');
   await cdp.send('Log.enable');
   await cdp.send('Page.enable');
+
+  /*
+   * يلتقط أسباب الرفض قبل تحميل التطبيق، في كل تنقّل لا في أول مرة
+   * فقط: التنقل بين تبويبات اللوحة والصفحة إعادة تحميل كاملة.
+   */
+  await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
+    source: `
+      addEventListener('unhandledrejection', (event) => {
+        const reason = event.reason;
+        window.__lastRejection =
+          (reason && (reason.stack || reason.message)) || String(reason);
+      });
+    `,
+  });
+  await cdp.evaluate(`
+    addEventListener('unhandledrejection', (event) => {
+      const reason = event.reason;
+      window.__lastRejection = (reason && (reason.stack || reason.message)) || String(reason);
+    });
+    true;
+  `);
 
   console.log('\n[1] first run: seeding');
   const booted = await waitForApp(cdp);
@@ -949,8 +986,8 @@ const countLines = (text) => (text === '' ? 0 : text.trimEnd().split('\n').lengt
   })()`);
 
   check(
-    'settings modal has every tab (print included)',
-    modal.count === 6,
+    'settings modal has every tab (fonts and print included)',
+    modal.count === 7,
     JSON.stringify(modal).slice(0, 200)
   );
   check(
@@ -997,6 +1034,99 @@ const countLines = (text) => (text === '' ? 0 : text.trimEnd().split('\n').lengt
     JSON.stringify(margins)
   );
 
+  /*
+   * حجم الخط لكل حقل: نضبط المستفيد على 15 نقطة ثم نقيس نموذج الخطوط
+   * ومعاينة الشيك المرئية، ثم نتأكد أن المستند المطبوع يحمل الرقم نفسه.
+   *
+   * القياس بنسبة الحاوية لا بالبكسل: المعاينة والنموذج بعرضين مختلفين
+   * (210mm وسعة البطاقة)، فالبكسل وحده ليس مقارنة عادلة. والهامش
+   * مسموح بنصف بكسل: المتصفح يُقرّب حجم الخط إلى بكسل صحيح، فالنسبة
+   * تُقارن بهامش يساوي 0.5px على عرض الحاوية.
+   */
+  const fonts = await cdp.evaluate(`(async () => {
+    const panel = document.querySelector('#management-panel');
+    const tab = panel && panel.querySelector('.sp-rail__item[data-tab="fonts"]');
+    if (!tab) return { error: 'fonts tab missing' };
+    tab.click();
+    await new Promise((r) => setTimeout(r, 500));
+
+    const controls = Array.from(document.querySelectorAll('#management-panel input[type="number"]'))
+      .map((input) => input.id)
+      .filter((id) => id.startsWith('font-'));
+    const specimenFields = panel.querySelectorAll('.sp-specimen__field[data-field]').length;
+
+    const input = document.getElementById('font-beneficiary');
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+    setter.call(input, '15');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 700));
+
+    const measure = (element, container) => {
+      if (!element || !container) return null;
+      const width = container.getBoundingClientRect().width;
+      if (width <= 0) return null;
+      return { px: parseFloat(getComputedStyle(element).fontSize), width };
+    };
+
+    const paper = panel.querySelector('.sp-specimen__paper');
+    const specimen = measure(paper && paper.querySelector('[data-field="beneficiary"]'), paper);
+
+    /*
+     * الحقل المضبوط هو الذي خرج عن الأحجام الافتراضية، فنحدّده بالرقم
+     * لا بالترتيب: الترتيب في DOM ليس ترتيب الحقول في البيانات.
+     */
+    const cheque = document.getElementById('check-preview');
+    const changed = Array.from(cheque.querySelectorAll('div[style*="font-size"]'))
+      .filter((el) => /^2\\.5/.test(el.style.fontSize));
+    const preview = changed.length === 1 ? measure(changed[0], cheque) : null;
+
+    return {
+      controls,
+      specimenFields,
+      specimen,
+      preview,
+      changedCount: changed.length,
+      amountWords: document.getElementById('font-amountWords')?.value ?? null,
+      date: document.getElementById('font-date')?.value ?? null,
+    };
+  })()`);
+
+  const specimenRatio = fonts.specimen ? fonts.specimen.px / fonts.specimen.width : null;
+  const previewRatio = fonts.preview ? fonts.preview.px / fonts.preview.width : null;
+  // نصف بكسل على عرض الحاوية: تقريب المتصفح لحجم الخط
+  const slack = Math.max(
+    0.5 / (fonts.specimen?.width ?? 1),
+    0.5 / (fonts.preview?.width ?? 1)
+  );
+  const expectedRatio = 0.025206; // 15 نقطة من عرض 210مم
+
+  check(
+    'fonts tab exposes one control per cheque field with a live specimen',
+    Array.isArray(fonts.controls) &&
+      fonts.controls.length === 5 &&
+      fonts.specimenFields === 5 &&
+      fonts.date !== null,
+    JSON.stringify(fonts)
+  );
+
+  check(
+    'a font size change reaches the specimen and the preview at the same ratio',
+    fonts.changedCount === 1 &&
+      specimenRatio !== null &&
+      previewRatio !== null &&
+      Math.abs(specimenRatio - expectedRatio) < slack &&
+      Math.abs(specimenRatio - previewRatio) < slack,
+    JSON.stringify({
+      specimenRatio,
+      previewRatio,
+      expectedRatio,
+      slack,
+      changed: fonts.changedCount,
+    })
+  );
+
   // الهامش يجب أن يصل إلى مستند الطباعة: 87mm - 12mm = 75mm من اليسار
   const printed = await cdp.evaluate(`(async () => {
     const close = Array.from(document.querySelectorAll('#management-panel button'))
@@ -1038,6 +1168,14 @@ const countLines = (text) => (text === '' ? 0 : text.trimEnd().split('\n').lengt
     })
   );
 
+  check(
+    'the chosen font size reaches the printed document (15pt = 2.5198cqw)',
+    /font-size:2\.519\d+cqw/.test(printed.html ?? ''),
+    JSON.stringify({
+      sizes: Array.from((printed.html ?? '').matchAll(/font-size:[\d.]+cqw/g)).map((m) => m[0]),
+    })
+  );
+
   // البقاء بعد إعادة التحميل: الهامش في جدول التفضيلات لا في حالة مؤقتة
   await cdp.send('Page.navigate', { url });
   await sleep(2200);
@@ -1059,6 +1197,55 @@ const countLines = (text) => (text === '' ? 0 : text.trimEnd().split('\n').lengt
     JSON.stringify(layoutRestored)
   );
 
+  const fontsRestored = await cdp.evaluate(`(async () => {
+    document.querySelector('#manage-open').click();
+    await new Promise((r) => setTimeout(r, 700));
+    const tab = document.querySelector('.sp-rail__item[data-tab="fonts"]');
+    if (!tab) return { error: 'fonts tab missing' };
+    tab.click();
+    await new Promise((r) => setTimeout(r, 500));
+    return {
+      beneficiary: document.getElementById('font-beneficiary')?.value ?? null,
+      date: document.getElementById('font-date')?.value ?? null,
+    };
+  })()`);
+  check(
+    'font sizes survive a reload (stored with the bank positions)',
+    fontsRestored.beneficiary === '15' && fontsRestored.date === '11.3',
+    JSON.stringify(fontsRestored)
+  );
+
+  /*
+   * السبب للمرّة الأولى: الترقية لا يكفي أن تنجح في الذاكرة، يجب أن
+   * يظهر العمود في ملف القاعدة المحفوظ. جدول SQLite يخزّن أسماء
+   * أعمونه كنص في صفحة المخطط، فنبحث عنه في بايتات الملف نفسها.
+   */
+  const storedFonts = await readFieldDefaults(cdp);
+  check(
+    'the font_cqw column exists in the saved database file',
+    storedFonts.text.includes('font_cqw'),
+    `${storedFonts.bytes} bytes`
+  );
+
+  /*
+   * القيمة نفسها في الملف لا في الصفحة: عمود REAL يُخزَّن مزدوجاً
+   * بثمانية بايتات، فنبحث عن البايتات نفسها. هذا يكشف الفشل الصامت
+   * الذي رأيناه: التعديل في الذاكرة والمستند يخرجان صحيحين بينما
+   * ترفض المعاملة الحفظ فلا يجد شيء في الملف.
+   *
+   * الترتيب big-endian لا little: بناء SQLite هنا مخوَّل بـ IEEE byte
+   * swap، وقد تأكّد ذلك من الملف نفسه (النمط موجود بترتيب big فقط).
+   * ونقتصر على أول أربعة بايتات: قد تتغيّر الأجزاء الأخرى بصيغة
+   * التخزين المعيارية المزاحة بلا أن يتغيّر الرقم المقروء.
+   */
+  const fifteenPtBytes = Buffer.alloc(8);
+  fifteenPtBytes.writeDoubleBE(2.5198412698412698);
+  check(
+    'the font size is written to the database file as a real number',
+    storedFonts.text.includes(fifteenPtBytes.toString('latin1')),
+    `looking for ${fifteenPtBytes.toString('hex')}`
+  );
+
   await cdp.send('Page.navigate', { url });
   await sleep(2200);
   check('app ready after settings reload', await waitForApp(cdp));
@@ -1066,6 +1253,20 @@ const countLines = (text) => (text === '' ? 0 : text.trimEnd().split('\n').lengt
     `document.querySelector('#bank-select').value`
   );
   check('selected bank restored from the database', restoredBank === 'bna_dz', restoredBank);
+
+  /*
+   * سبب الرفض: CDP يعطي الاستثناء نصاً واحداً بلا سبب، والسبب وحده
+   * هو الذي يحدّد هل الخطأ في الاستعلام أم في الحفظ.
+   */
+  if (cdp.sawPromiseRejection) {
+    const reasons = (await Promise.all(cdp.rejectionReads)).filter(Boolean);
+    cdp.problems.push(
+      'rejection reason: ' +
+        (reasons.length === 0
+          ? 'not captured'
+          : reasons.map((reason) => String(reason).slice(0, 400)).join(' | '))
+    );
+  }
 
   console.log(
     '\nconsole: ' + (cdp.problems.length === 0 ? 'clean' : 'PROBLEMS\n' + cdp.problems.join('\n'))

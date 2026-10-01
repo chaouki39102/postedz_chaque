@@ -167,6 +167,20 @@ export const LABEL_SEEDS: readonly LabelSeed[] = [
   { key: 'manage.printAmountRight', ar: 'المسافة من الحافة اليمنى', fr: 'Distance du bord droit' },
   { key: 'manage.printAmountDrag', ar: 'اسحب نص المبلغ في المعاينة لتحريكه بصرياً، أو اكتب هنا رقماً دقيقاً.', fr: 'Glissez le montant dans l’aperçu pour le déplacer à l’œil, ou saisissez ici une valeur exacte.' },
 
+  // ---- تبويب الخطوط: حجم كل حقل على حدة ----
+  { key: 'manage.fontsTab', ar: 'الخطوط', fr: 'Polices' },
+  { key: 'manage.fontsTitle', ar: 'حجم خط الحقول', fr: 'Taille de la police des champs' },
+  { key: 'manage.fontsHint', ar: 'النقطة مقيسة على شيك 210مم كما يُطبع. الضبط هنا هو نفس الخط في المعاينة وفي الورقة، ويُحفظ لكل بنك ولكل لغة.', fr: 'Le point est mesuré sur un chèque de 210 mm, tel qu’imprimé. Le réglage est le même dans l’aperçu et sur la feuille, et il est enregistré par banque et par langue.' },
+  { key: 'manage.fontsReset', ar: 'إعادة كل الأحجام', fr: 'Réinitialiser toutes les tailles' },
+  { key: 'manage.fontDate', ar: 'التاريخ', fr: 'Date' },
+  { key: 'manage.fontPlace', ar: 'مكان الاستخراج', fr: 'Lieu de paiement' },
+  { key: 'manage.fontBeneficiary', ar: 'اسم المستفيد', fr: 'Nom du bénéficiaire' },
+  { key: 'manage.fontAmount', ar: 'المبلغ بالأرقام', fr: 'Montant en chiffres' },
+  { key: 'manage.fontAmountWords', ar: 'المبلغ بالحروف', fr: 'Montant en lettres' },
+  { key: 'manage.fontsSpecimen', ar: 'نموذج بالحجم الحقيقي', fr: 'Aperçu à taille réelle' },
+  { key: 'manage.fontsSpecimenHint', ar: 'النصوص أدناه بالأحجام التي اخترتها، وفي مواضعها على الشيك.', fr: 'Les textes ci-dessous apparaissent aux tailles choisies, à leur place sur le chèque.' },
+  { key: 'manage.fontsWidthNote', ar: 'عرض نص المبلغ بالحروف يُضبط من أسفل المعاينة (شريط «عرض المبلغ بالحروف»).', fr: 'La largeur du montant en lettres se règle sous l’aperçu (barre « largeur du montant »).' },
+
   // ---- تبويبات جديدة: القيم الافتراضية والقوالب ----
   { key: 'manage.defaultsTab', ar: 'القيم الافتراضية', fr: 'Valeurs par défaut' },
   { key: 'manage.presetsTab', ar: 'القوالب', fr: 'Modèles' },
