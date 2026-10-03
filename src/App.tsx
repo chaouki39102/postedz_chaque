@@ -228,18 +228,18 @@ const App: React.FC = () => {
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-amber-200/30 dark:bg-amber-900/40 rounded-full blur-3xl floating-animation" style={{ animationDelay: '3s' }}></div>
       </div>
 
-      <header className="relative z-10 bg-white/60 dark:bg-gray-800/60 backdrop-blur-lg border-b border-gray-200/80 dark:border-gray-700/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+      <header className="relative z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 slide-in">
-              <div className="bg-[#0F7BFF] p-2 rounded-lg shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="bg-gradient-to-br from-blue-600 to-yellow-500 p-2 rounded-lg">
                 <img src={APP_LOGO_URL} alt="شعار التطبيق" className="w-8 h-8 object-contain" />
               </div>
               <div>
-                <h1 className="text-xl md:text-2xl font-extrabold text-[#0F172A] dark:text-[#F5F7FA]">
+                <h1 className="text-lg md:text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-yellow-500 dark:from-blue-400 dark:to-yellow-400">
                   {t('app.title')}
                 </h1>
-                <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 font-medium">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   {t('app.subtitle')}
                 </p>
               </div>
@@ -249,7 +249,7 @@ const App: React.FC = () => {
                   type="button"
                   id="manage-open"
                   onClick={() => setIsManageOpen(true)}
-                  className="flex items-center gap-2 px-3 py-2 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 rounded-lg text-sm font-medium"
+                  className="flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium"
                 >
                   <Settings className="w-4 h-4" />
                   <span>{t('manage.open')}</span>
