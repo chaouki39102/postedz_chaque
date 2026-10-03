@@ -25,6 +25,17 @@ export const LABEL_SEEDS: readonly LabelSeed[] = [
   { key: 'app.smartConversion', ar: 'تحويل ذكي', fr: 'Conversion intelligente' },
   { key: 'app.footerCredits', ar: 'جميع الحقوق محفوظة', fr: 'Tous droits réservés' },
   { key: 'app.developedBy', ar: 'تطوير', fr: 'Développé par' },
+  { key: 'app.ownerName', ar: 'عبد الصادق شوقي', fr: 'Abdessadok Chaouki' },
+  { key: 'app.ownerPhone', ar: 'الهاتف والواتساب', fr: 'Téléphone et WhatsApp' },
+  { key: 'app.ownerEmail', ar: 'الإيميل', fr: 'E-mail' },
+
+  // ---- تثبيت التطبيق (PWA) ----
+  { key: 'pwa.title', ar: 'ثبّت التطبيق على جهازك', fr: 'Installez l’application sur votre appareil' },
+  { key: 'pwa.body', ar: 'يعمل بدون إنترنت ويفتح بسرعة أكبر كتطبيق مستقل.', fr: 'Fonctionne hors ligne et s’ouvre plus vite comme application.' },
+  { key: 'pwa.install', ar: 'تثبيت', fr: 'Installer' },
+  { key: 'pwa.later', ar: 'لاحقاً', fr: 'Plus tard' },
+  { key: 'pwa.iosTitle', ar: 'ثبّت التطبيق من متصفح سفاري', fr: 'Installez depuis Safari' },
+  { key: 'pwa.iosBody', ar: 'اضغط على زر المشاركة ثم اختر «إضافة إلى الشاشة الرئيسية».', fr: 'Touchez Partager puis « Sur l’écran d’accueil ».', },
 
   // ---- شريط الاختيار ----
   { key: 'nav.model', ar: 'اختر النموذج:', fr: 'Modèle :' },

@@ -11,11 +11,13 @@
 const DARK_MODE_KEY = 'dark_mode';
 const BANK_KEY = 'selected_bank_id';
 const LANGUAGE_KEY = 'language';
+const PWA_DISMISSED_KEY = 'pwa_install_dismissed';
 
 export const STORAGE_KEYS = {
   darkMode: DARK_MODE_KEY,
   bank: BANK_KEY,
   language: LANGUAGE_KEY,
+  pwaDismissed: PWA_DISMISSED_KEY,
 } as const;
 
 export const loadPreference = (key: string): string | null => {

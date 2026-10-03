@@ -3,6 +3,7 @@ import CheckForm from './components/CheckForm';
 import CheckPreview from './components/CheckPreview';
 import ManagementPanel from './components/manage/ManagementPanel';
 import { FallbackBanner } from './components/BootScreen';
+import { InstallPrompt } from './components/InstallPrompt';
 import { Sparkles, Globe, BookOpen, Award, Shield, Zap, Users, Sun, Moon, Settings } from 'lucide-react';
 import { mergeWithDefaults } from './banksData';
 import { useBankImageUrl, useBanks } from './hooks/useBanks';
@@ -437,14 +438,28 @@ const App: React.FC = () => {
               <h3 className="text-lg font-bold">{t('app.title')}</h3>
             </div>
             <div className="flex flex-col items-center md:items-end gap-2 text-gray-400 text-sm text-center md:text-right">
-              <p>جميع الحقوق محفوظة © {new Date().getFullYear()}</p>
-              <p>عبد الصادق شوقي</p>
-              <p>الهاتف والواتساب: +213667574666</p>
-              <p>الإيميل: abdessadokchaouki@gmail.com</p>
+              <p>
+                {t('app.footerCredits')} © {new Date().getFullYear()}
+              </p>
+              <p className="text-gray-300 dark:text-gray-200 font-medium">{t('app.ownerName')}</p>
+              <p>
+                {t('app.ownerPhone')}:{' '}
+                <a href="tel:+213667574666" dir="ltr" className="inline-block">
+                  +213667574666
+                </a>
+              </p>
+              <p>
+                {t('app.ownerEmail')}:{' '}
+                <a href="mailto:abdessadokchaouki@gmail.com" dir="ltr" className="inline-block">
+                  abdessadokchaouki@gmail.com
+                </a>
+              </p>
             </div>
           </div>
         </div>
       </footer>
+
+      <InstallPrompt />
     </div>
   );
 };
