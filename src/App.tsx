@@ -232,11 +232,11 @@ const App: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 slide-in">
-              <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-lg shadow-md">
-                <img src={APP_LOGO_URL} alt="" className="w-8 h-8 object-contain" />
+              <div className="bg-[#0F7BFF] p-2 rounded-lg shadow-md">
+                <img src={APP_LOGO_URL} alt="شعار التطبيق" className="w-8 h-8 object-contain" />
               </div>
               <div>
-                <h1 className="text-xl md:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-700 dark:from-indigo-400 dark:to-purple-500">
+                <h1 className="text-xl md:text-2xl font-extrabold text-[#0F172A] dark:text-[#F5F7FA]">
                   {t('app.title')}
                 </h1>
                 <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 font-medium">
@@ -245,30 +245,30 @@ const App: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                id="manage-open"
-                onClick={() => setIsManageOpen(true)}
-                className="flex items-center gap-2 px-3 py-2 border border-indigo-300 dark:border-indigo-600 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors text-sm font-medium"
-              >
-                <Settings className="w-4 h-4" />
-                <span>{t('manage.open')}</span>
-              </button>
+                <button
+                  type="button"
+                  id="manage-open"
+                  onClick={() => setIsManageOpen(true)}
+                  className="flex items-center gap-2 px-3 py-2 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 rounded-lg text-sm font-medium"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>{t('manage.open')}</span>
+                </button>
               <button
                 type="button"
                 onClick={toggleDarkMode}
                 aria-pressed={isDark}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-800 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-300 transition-colors text-sm font-medium"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 dark:hover:from-blue-600 dark:hover:to-blue-700 text-sm font-medium transition-colors"
               >
                 {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                 <span>{isDark ? t('app.lightMode') : t('app.darkMode')}</span>
               </button>
-              <div className="hidden md:flex items-center gap-2 bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600">
-                <Sparkles className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
-                <span className="text-sm font-bold text-indigo-600 dark:text-indigo-300">
-                  {t('app.smartConversion')}
-                </span>
-              </div>
+                <div className="hidden md:flex items-center gap-2 bg-blue-50 dark:bg-blue-950/40 px-3 py-2 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <Sparkles className="w-5 h-5 text-yellow-500 dark:text-yellow-400" />
+                  <span className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                    {t('app.smartConversion')}
+                  </span>
+                </div>
             </div>
           </div>
         </div>
@@ -289,7 +289,7 @@ const App: React.FC = () => {
                 onChange={(event) => setBankId(event.target.value)}
                 value={activeBankId}
                 disabled={isBanksLoading}
-                className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition disabled:opacity-60"
+                className="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition disabled:opacity-60"
               >
                 {isBanksLoading && <option value="">{t('nav.loading')}</option>}
                 {!isBanksLoading && banks.length === 0 && <option value="">{t('nav.noBanks')}</option>}
@@ -303,7 +303,7 @@ const App: React.FC = () => {
             <button
               type="button"
               onClick={toggleLanguage}
-              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors text-sm font-medium w-full sm:w-auto justify-center"
+              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium w-full sm:w-auto justify-center"
             >
               <Globe className="w-4 h-4" />
               <span>{language === 'ar' ? 'Français' : 'العربية'}</span>
@@ -341,7 +341,7 @@ const App: React.FC = () => {
 
               <div className="bg-white dark:bg-gray-800/80 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-5 flex items-center gap-3">
-                  <BookOpen className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                  <BookOpen className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                   {t('guide.title')}
                 </h3>
 
@@ -354,7 +354,7 @@ const App: React.FC = () => {
                     ] as const
                   ).map(([titleKey, bodyKey], index) => (
                     <div className="flex items-start gap-4" key={titleKey}>
-                      <span className="bg-indigo-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold flex-shrink-0 mt-0.5">
+                      <span className="bg-gradient-to-br from-blue-600 to-yellow-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold flex-shrink-0 mt-0.5">
                         {index + 1}
                       </span>
                       <div>
@@ -429,7 +429,7 @@ const App: React.FC = () => {
         />
       )}
 
-      <footer className="relative z-10 bg-gray-800 dark:bg-gray-900 text-white mt-16 border-t-4 border-indigo-500">
+      <footer className="relative z-10 bg-[#0f172a] dark:bg-[#040816] text-white mt-16 border-t-4 border-yellow-400">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
           <div className="flex flex-col md:flex-row justify-between items-center text-center md:text-right gap-6">
             <div className="flex items-center gap-3">

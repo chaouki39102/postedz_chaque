@@ -20,12 +20,12 @@ export const BootScreen: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-gray-900 px-4">
       <div className="flex flex-col items-center gap-5 text-center max-w-md">
         <div className="relative">
-          <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full" />
-          <div className="relative bg-gradient-to-br from-indigo-500 to-purple-600 p-4 rounded-2xl shadow-lg">
+          <div className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-full" />
+          <div className="relative bg-[#0F7BFF] p-4 rounded-2xl shadow-lg">
             <Database className="w-8 h-8 text-white" />
           </div>
           <Loader2
-            className="absolute -bottom-2 -right-2 w-7 h-7 text-indigo-500 animate-spin"
+            className="absolute -bottom-2 -right-2 w-7 h-7 text-yellow-400 animate-spin"
             aria-hidden="true"
           />
         </div>
@@ -42,7 +42,7 @@ export const BootScreen: React.FC = () => {
           aria-live="polite"
           className="w-64 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden"
         >
-          <div className="h-full w-1/3 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full animate-pulse" />
+          <div className="h-full w-1/3 bg-gradient-to-r from-blue-500 to-yellow-400 rounded-full animate-pulse" />
         </div>
       </div>
     </div>
