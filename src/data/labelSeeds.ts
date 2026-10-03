@@ -18,7 +18,7 @@ export interface LabelSeed {
 
 export const LABEL_SEEDS: readonly LabelSeed[] = [
   // ---- التطبيق ----
-  { key: 'app.title', ar: 'مولّد شيكات البنوك الجزائرية', fr: 'Générateur de chèques des banques algériennes' },
+  { key: 'app.title', ar: 'طباعة شيكات البنوك الجزائرية', fr: 'Générateur de chèques des banques algériennes' },
   { key: 'app.subtitle', ar: 'نظام ملء الشيكات بدقة وسهولة', fr: 'Remplissage de chèques avec précision' },
   { key: 'app.darkMode', ar: 'الوضع الداكن', fr: 'Mode sombre' },
   { key: 'app.lightMode', ar: 'الوضع الفاتح', fr: 'Mode clair' },

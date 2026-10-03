@@ -30,7 +30,7 @@ export const FIELD_DEFAULT_SEEDS: readonly FieldDefaultSeed[] = [
   // ---- العربية ----
   { language: 'ar', field: 'date', value: TODAY },
   { language: 'ar', field: 'place', value: 'الوادي' },
-  { language: 'ar', field: 'beneficiary', value: 'شركة الحاج علي بيوض للتجارة ذ م م' },
+  { language: 'ar', field: 'beneficiary', value: 'شركة التموين العام' },
   { language: 'ar', field: 'amount', value: '500000.00' },
 
   // ---- الفرنسية ----

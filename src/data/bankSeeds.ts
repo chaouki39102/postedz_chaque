@@ -28,7 +28,7 @@ export const BANK_SEEDS: readonly BankSeedEntry[] = [
   { id: 'cpa_dz', nameAr: 'القرض الشعبي الجزائري (CPA)', nameFr: 'Crédit Populaire d’Algérie (CPA)', imageUrl: '/banks/alg-cpa.jpg' },
   { id: 'abc_dz_2', nameAr: 'بنك ABC - نموذج 2', nameFr: 'ABC Bank - Modèle 2', imageUrl: '/banks/alg-abc2.jpg' },
   { id: 'abc_dz_24', nameAr: 'بنك ABC - نموذج 24', nameFr: 'ABC Bank - Modèle 24', imageUrl: '/banks/alg-abc24.jpg' },
-  { id: 'alg_dz', nameAr: 'بنك الجزائر والخليج', nameFr: 'Banque d’Algérie et du Golfe', imageUrl: '/banks/alg-alg.jpg' },
+  { id: 'alg_dz', nameAr: 'بريد الجزائر', nameFr: 'Banque d’Algérie et du Golfe', imageUrl: '/banks/alg-alg.jpg' },
   { id: 'bdl_dz', nameAr: 'بنك التنمية المحلية', nameFr: 'Banque de Développement Local', imageUrl: '/banks/alg-bdl.jpg' },
   { id: 'bdl_dz_2', nameAr: 'بنك التنمية المحلية - نموذج 2', nameFr: 'BDL - Modèle 2', imageUrl: '/banks/alg-bdl2.jpg' },
   { id: 'bea_dz', nameAr: 'البنك الخارجي الجزائري', nameFr: 'Banque Extérieure d’Algérie', imageUrl: '/banks/alg-bea.jpg' },

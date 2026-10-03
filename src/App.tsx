@@ -436,9 +436,12 @@ const App: React.FC = () => {
               <img src={APP_LOGO_URL} alt="" className="w-8 h-8 object-contain" />
               <h3 className="text-lg font-bold">{t('app.title')}</h3>
             </div>
-            <p className="text-gray-400 text-sm">
-              {t('app.footerCredits')}
-            </p>
+            <div className="flex flex-col items-center md:items-end gap-2 text-gray-400 text-sm text-center md:text-right">
+              <p>جميع الحقوق محفوظة © {new Date().getFullYear()}</p>
+              <p>عبد الصادق شوقي</p>
+              <p>الهاتف والواتساب: +213667574666</p>
+              <p>الإيميل: abdessadokchaouki@gmail.com</p>
+            </div>
           </div>
         </div>
       </footer>
